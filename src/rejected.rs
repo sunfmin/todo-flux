@@ -200,3 +200,13 @@ fn index_from_walking_one_slice_used_on_another(walked: &[Todo], other: &[Todo])
 fn any_selection_claimed_to_hold_everything<S: Selection>(selection: &S, by: S::By) -> bool {
     selection.has(by)
 }
+
+// The same arithmetic as `Progress::percent`, which Flux accepts. Here the
+// solver is told to forget what `*` and `/` compute, and the bound is gone:
+// that bound rests on the arithmetic itself, not on anything weaker.
+#[should_fail]
+#[opts(uif_ops = "*,/")]
+#[spec(fn(&Progress[@p]) -> usize{v: v <= 100} requires p.total > 0)]
+fn percent_bound_claimed_without_what_times_and_divide_compute(progress: &Progress) -> usize {
+    (progress.done as u128 * 100 / progress.total as u128) as usize
+}
