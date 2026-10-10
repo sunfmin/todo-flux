@@ -49,14 +49,15 @@ a runtime panic or a silently wrong file.
 | Sets | Which numbers were picked: none can be picked twice | `Picks` |
 | Bitvectors, bitvector constants | A set of statuses never holds a bit that is not a status, and behaves like a set | `StatusSet`, `STATUS_BITS` |
 | Properties for primitive operators | A status's bit is `1 << slot`, so the bits follow the slots | `OneShiftedToASlot`, `Status::bit` |
-| Uninterpreted operators (`uif_ops`) | The percent bound rests on what `*` and `/` compute: forget that and it is unprovable | `src/rejected.rs` |
+| Uninterpreted operators (`uif_ops`) | The counting loop's indexes are proved in bounds with `+` treated as unknown, so the proof does not lean on its unchecked additions; the percent bound, by contrast, is unprovable without `*` and `/` | `TodoList::tally`, `src/rejected.rs` |
 | `char` literals, sort casts | The priority in a line is one digit, and it is read as the number it stands for | `priority_digit` |
 | String literals in refinements | Each status has its own mark, so a mark in the file says which status it is | `mark_of`, `Status::mark` |
 | Uninterpreted functions | A text makes a title exactly when it is not blank, whatever "blank" computes | `blank`, `Title::new` |
 | Hidden and revealed definitions | Other proofs rely on the status rule holding, not on what it says | `can_become` |
 | `forall` preconditions, bounded quantifiers | Theorems: no status is a dead end; no priority slot is spare | `status_theorems` |
 | Generic (abstract) refinements | The smaller of two priorities is a priority, said once for every type | `cmp_specs` |
-| Extern specs: a struct and its methods, a free function, a primitive type | What `BTreeSet`, `std::cmp::min` and `char::to_digit` promise | `set_specs`, `cmp_specs`, `char_specs` |
+| Extern specs: a struct and its methods, a free function, a primitive type, a trait | What `BTreeSet`, `std::cmp::min`, `char::to_digit` and `Default` promise; a todo starts open | `set_specs`, `cmp_specs`, `char_specs`, `default_specs` |
+| Include patterns | The refined vector's file is the trusted base, named once | `Cargo.toml` (`include_trusted`) |
 | A refined vector (`RVec`) | Reading a todo at a proved index cannot panic | `src/rvec.rs` |
 | Detached specs, `trusted_derive` | `==` on statuses is true exactly for equal statuses | `Status` |
 | Opaque structs, trusted functions | A title is never blank | `Title`, `RVec` |
@@ -81,14 +82,18 @@ a runtime panic or a silently wrong file.
 
 ## Coverage of the Flux guide
 
-Every section of the [specifications guide](https://flux-rs.github.io/flux/guide/specifications.html)
-has a use above. Two notes:
+The table follows the sections of the
+[specifications guide](https://flux-rs.github.io/flux/guide/specifications.html);
+each has a use in the code. Some uses are small, and it is fair to say so:
 
-- Extern specs for traits are used, not written: `list[i]` and the
-  `enumerate` loop rely on the ones `flux-core` ships for `Index` and
-  `Iterator`.
-- Include patterns are a command-line feature. To check one function instead
-  of the crate: `./verify.sh check --only-check='def:list::TodoList::remove_all'`.
+- `uif_ops` can only take knowledge away from the solver, so it proves
+  nothing new here. It shows which proofs depend on arithmetic.
+- The theorems (`status_theorems`, `status_set_theorems`, `picks_theorems`,
+  `title_theorems`) are compiled only under Flux. They state rules; the
+  program does not call them.
+- Include patterns also work from the command line. To check one function
+  instead of the crate:
+  `./verify.sh check --only-check='def:list::TodoList::remove_all'`.
 
 ## Build, test, verify
 
