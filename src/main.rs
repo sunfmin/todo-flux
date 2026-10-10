@@ -59,6 +59,13 @@ defs! {
     use crate::list::need_with;
 }
 
+// What the arguments of `rm` are read into, said here and not on the
+// function: a detached spec, the same promise from outside the code.
+#[specs {
+    fn indexes_of(list: &TodoList[@n], arg: &str) -> Result<Vec<usize{i: i < n}>, String>;
+}]
+const _: () = ();
+
 /// What the user asked for, with every todo number already turned into an
 /// index. The refinement `need` is the shortest list the command can run on,
 /// so a command that `parse` checked against a list runs on it with no
@@ -230,7 +237,6 @@ fn index_of(list: &TodoList, arg: &str) -> Result<usize, String> {
 
 /// The indexes an argument of `rm` names: one todo number, or a range of
 /// them written `2-4`.
-#[spec(fn(&TodoList[@n], _) -> Result<Vec<usize{i: i < n}>, _>)]
 fn indexes_of(list: &TodoList, arg: &str) -> Result<Vec<usize>, String> {
     let (first, last) = match arg.split_once('-') {
         Some((first, last)) if !first.is_empty() => (first, last),
