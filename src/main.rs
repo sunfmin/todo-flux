@@ -17,7 +17,7 @@ use std::{
 
 use flux_rs::{attrs::*, defs};
 use list::{
-    HIGHEST_PRIORITY, LOWEST_PRIORITY, Picks, Priority, Status, StatusSet, Title, TodoList,
+    HIGHEST_PRIORITY, LOWEST_PRIORITY, Picks, Priority, Status, StatusSet, Title, Todo, TodoList,
     priorities, priority, slot,
 };
 
@@ -32,6 +32,7 @@ usage: todo [list]          show all todos
        todo pri <n> <1-3>   set the priority of todo n (1 is highest)
        todo mv <n> <m>      move todo n to position m
        todo rm <n>..        delete the todos numbered
+       todo clear           delete every done todo
 
 Todos are stored in $TODO_FILE (default: ~/.todo.txt).";
 
@@ -77,6 +78,8 @@ enum Command {
     Move(usize, usize),
     #[variant((Picks[@picks]) -> Command[picks.need])]
     Remove(Picks),
+    #[variant(Command[0])]
+    Clear,
 }
 
 /// Proved from the invariant alone, for a command built any way at all.
@@ -121,10 +124,10 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
         }
         Command::SetPriority(index, priority) => list.set_priority(index, priority),
         Command::Move(from, to) => list.move_to(from, to),
-        Command::Remove(picks) => {
-            for removed in list.remove_all(&picks) {
-                written(writeln!(out, "removed: {}", removed.title.as_str()))?;
-            }
+        Command::Remove(picks) => written(print_removed(out, list.remove_all(&picks)))?,
+        Command::Clear => {
+            let done = StatusSet::none().with(Status::Done);
+            written(print_removed(out, list.remove_all(&done)))?;
         }
     }
 
@@ -151,6 +154,7 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
             }
             Ok(Command::List(only))
         }
+        ("clear", []) => Ok(Command::Clear),
         ("help" | "-h" | "--help", _) => Ok(Command::Help),
         ("next", []) => Ok(Command::Next),
         ("add", words) => match Title::new(&words.join(" ")) {
@@ -227,6 +231,13 @@ fn written(result: io::Result<()>) -> Result<(), String> {
         Err(e) if e.kind() != io::ErrorKind::BrokenPipe => Err(format!("cannot write output: {e}")),
         _ => Ok(()),
     }
+}
+
+fn print_removed(out: &mut dyn Write, removed: Vec<Todo>) -> io::Result<()> {
+    for todo in removed {
+        writeln!(out, "removed: {}", todo.title.as_str())?;
+    }
+    Ok(())
 }
 
 /// Prints the todos, all of them or (when `only` names any) just those in
