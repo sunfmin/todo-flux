@@ -172,6 +172,21 @@ mod default_specs {
     }
 }
 
+/// The value that was found, or else the one its type starts from. Written
+/// for any type with a default, so all Flux knows of that default here is
+/// what the spec of the `Default` trait says.
+#[expect(
+    clippy::manual_unwrap_or_default,
+    reason = "std's `unwrap_or_default` has no spec, so Flux would learn nothing from it"
+)]
+#[spec(fn(Option<T>[@found]) -> T{value: !found => <T as Default>::is_default(value)})]
+fn or_default<T: Default>(found: Option<T>) -> T {
+    match found {
+        Some(value) => value,
+        None => T::default(),
+    }
+}
+
 /// A todo starts open: on `add`, and when a line in the file has no mark.
 #[assoc(fn is_default(status: Status) -> bool { status == Status::Open })]
 impl Default for Status {
@@ -432,11 +447,11 @@ mod status_theorems {
         && (mark_of(s) == mark_of(Status::Done) => s == Status::Done))]
     fn marks_tell_statuses_apart() {}
 
-    /// The status a todo starts in is open, known from the spec of the
-    /// `Default` trait alone.
+    /// A line with no mark on it loads as an open todo, known from the spec
+    /// of the `Default` trait alone.
     #[spec(fn() -> Status{s: s == Status::Open})]
-    fn a_new_todo_is_open() -> Status {
-        Status::default()
+    fn a_line_without_a_mark_is_open() -> Status {
+        super::or_default(None)
     }
 
     #[reveal(can_become)]
@@ -480,18 +495,18 @@ impl Todo {
     /// priority means the default, so any hand-edited file still loads. A
     /// line with no title on it is not a todo.
     fn from_line(line: &str) -> Option<Todo> {
-        let mut status = Status::default();
+        let mut marked = None;
         let mut rest = line;
         for candidate in Status::ALL {
             if let Some(after_mark) = line.strip_prefix(candidate.mark()) {
-                status = candidate;
+                marked = Some(candidate);
                 rest = after_mark;
             }
         }
         let (priority, title) = split_priority(rest);
         Some(Todo {
             title: Title::new(title)?,
-            status,
+            status: or_default(marked),
             priority,
         })
     }
