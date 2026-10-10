@@ -6,14 +6,20 @@ A capability whose line can be broken without Flux noticing is not doing any
 work, and is reported as SURVIVED. So is one whose line is gone, which keeps
 a refactor from quietly dropping the last use of a capability.
 
-    uv run mutants.py            run every mutant (a few minutes)
+Before that it reads the guide itself, at the Flux revision `Cargo.toml`
+pins, and checks that every heading and every named sub-item in it has a
+mutant here, or is listed in NOT_REFLECTED with the reason why not.
+
+    uv run mutants.py            check the sections, then run every mutant
     uv run mutants.py Sets       run the mutants whose section contains "Sets"
+    uv run mutants.py --sections only check the sections against the guide
 """
 
 import pathlib
 import re
 import subprocess
 import sys
+import urllib.request
 
 # For a mutant with nothing in it to reject: Flux must instead stop counting a
 # function it used to count as ignored.
@@ -37,11 +43,11 @@ MUTANTS = [
     ("Named Function Signatures", "src/list.rs", "fn(&TodoList[@n], index: usize{index < n}) -> usize[index + 1]", "fn(&TodoList[@n], index: usize{index < n}) -> usize[index]"),
     ("Requires Clauses", "src/list.rs", "requires p.total > 0", "requires p.total >= 0"),
     ("Refining Structs", "src/list.rs", "#[field({usize[done] | done <= total})]", "#[field(usize)]"),
-    ("Invariants on Structs", "src/list.rs", "#[invariant(done <= total)]", "#[invariant(done >= total)]"),
-    ("Opaque Structs", "src/list.rs", "#[opaque]\n", ""),
+    ("Refining Structs: Invariants on Structs", "src/list.rs", "#[invariant(done <= total)]", "#[invariant(done >= total)]"),
+    ("Refining Structs: Opaque Structs", "src/list.rs", "#[opaque]\n", ""),
     ("Refining Enums", "src/main.rs", "(usize[@index], Status) -> Command[index + 1]", "(usize[@index], Status) -> Command[index]"),
-    ("Invariants on Enums", "src/main.rs", "#[invariant(need >= 0)]\nenum Command", "#[invariant(need > 0)]\nenum Command"),
-    ("Reflecting Enums", "src/list.rs", "#[reflect]\n", ""),
+    ("Refining Enums: Invariants on Enums", "src/main.rs", "#[invariant(need >= 0)]\nenum Command", "#[invariant(need > 0)]\nenum Command"),
+    ("Refining Enums: Reflecting Enums", "src/list.rs", "#[reflect]\n", ""),
     ("Field Syntax for Indices: Structs", "src/list.rs", "status: if can_become(t.status, to) { to } else { t.status }", "status: if can_become(t.status, to) { t.status } else { to }"),
     ("Field Syntax for Indices: Enums", "src/main.rs", "Command{c: c.need <= n}", "Command{c: c.need <= n + 1}"),
     ("Field Syntax for Indices: Updates", "src/list.rs", "Todo { priority: priority, ..t }", "Todo { priority: 1, ..t }"),
@@ -50,9 +56,10 @@ MUTANTS = [
     ("Refined Associated Types", "src/list.rs", "-> bool[<Self as Selection>::holds(selection, by)]", "-> bool[!<Self as Selection>::holds(selection, by)]"),
     ("Ignored and trusted code: trusted", "src/list.rs", "    #[trusted]\n    #[spec(fn(&str[@text]) -> Option<Title>[!blank(text)])]", "    #[spec(fn(&str[@text]) -> Option<Title>[!blank(text)])]"),
     ("Ignored and trusted code: ignore", "src/main.rs", "#[flux_rs::ignore]\n", "", UNCOUNTED),
-    ("Derive-generated code", "src/list.rs", '#[trusted_derive(reason = "Flux cannot check the discriminant comparison derive writes")]\n', ""),
+    ("Ignored and trusted code: Derive-generated code", "src/list.rs", '#[trusted_derive(reason = "Flux cannot check the discriminant comparison derive writes")]\n', ""),
     ("Pragma: `should_fail`", "src/rejected.rs", "#[should_fail]\n", ""),
-    ("Const Generics", "src/list.rs", "let mut counts = [0; N];", "let mut counts = [0; 2];"),
+    ("Const Generics: Refining Array Lengths", "src/list.rs", "let mut counts = [0; N];", "let mut counts = [0; 2];"),
+    ("Const Generics: Refining Function Signatures", "src/list.rs", "slot_of: fn(&Todo) -> Option<usize{slot: slot < N}>", "slot_of: fn(&Todo) -> Option<usize{slot: slot < N + 1}>"),
     ("Type Aliases", "src/list.rs", "#[alias(type Priority = u8{p: is_priority(p)})]", "#[alias(type Priority = u8{p: p <= LOWEST_PRIORITY})]"),
     ("Spec Function Definitions: Plain Expressions", "src/list.rs", "{ 1 <= pos && pos <= len }", "{ 0 <= pos && pos <= len }"),
     ("Spec Function Definitions: `let` binders", "src/list.rs", "let past = index + 1;\n        if past > need", "let past = index;\n        if past > need"),
@@ -70,10 +77,10 @@ MUTANTS = [
     ("Function Pointers", "src/list.rs", "slot_of: fn(&Todo) -> Option<usize{slot: slot < N}>", "slot_of: fn(&Todo) -> Option<usize{slot: slot <= N}>"),
     ("Traits and Implementations", "src/list.rs", "    fn has(&self, index: usize) -> bool {\n        self.contains(index)", "    fn has(&self, index: usize) -> bool {\n        !self.contains(index)"),
     ("Impl Trait", "src/list.rs", "#[spec(fn() -> impl Iterator<Item = Priority>)]\npub fn priorities() -> impl Iterator<Item = Priority>", "pub fn priorities() -> impl Iterator<Item = u8>"),
-    ("Dynamic Trait Objects", "src/list.rs", "#[spec(fn(&Self, &TodoList[@n]) -> Option<usize{i: i < n}>)]\n    fn of(&self, list: &TodoList) -> Option<usize>;", "#[spec(fn(&Self, &TodoList[@n]) -> Option<usize{i: i <= n}>)]\n    fn of(&self, list: &TodoList) -> Option<usize>;"),
-    ("Generic Refinements", "src/list.rs", "-> u8{v: p(v) && v <= a && v <= b}", "-> u8{v: v <= a && v <= b}"),
+    ("Dynamic Trait Objects", "src/list.rs", "    trait Choice {\n        fn of(&Self, list: &TodoList[@n]) -> Option<usize{i: i < n}>;", "    trait Choice {\n        fn of(&Self, list: &TodoList[@n]) -> Option<usize{i: i <= n}>;"),
+    ("Generic Refinements: Horn Refinements", "src/list.rs", "-> u8{v: p(v) && v <= a && v <= b}", "-> u8{v: v <= a && v <= b}"),
     ("Bitvector Refinements: Operators", "src/list.rs", "bits & STATUS_BITS == bits", "bits & STATUS_BITS == 0"),
-    ("Bitvector Refinements: Specification functions", "src/list.rs", "bool[bits & bit_of(status) != 0])]\n    pub fn contains", "bool[bits & bit_of(status) == 0])]\n    pub fn contains"),
+    ("Bitvector Refinements: Specification functions", "src/list.rs", "-> StatusSet[bits | bit_of(status)];", "-> StatusSet[bits & bit_of(status)];"),
     ("Bitvector Refinements: Extensions", "src/list.rs", "bv_zero_extend_32_to_64(bits) & 7 ==", "bv_zero_extend_32_to_64(bits) & 3 =="),
     ("Bitvector Refinements: Bitvector Constants", "src/list.rs", "#[constant(bv_int_to_bv32(7))]", "#[constant(bv_int_to_bv32(3))]"),
     ("`char` Literals", "src/list.rs", "['0' <= c && c <= '9']", "['0' <= c && c <= '2']"),
@@ -84,22 +91,69 @@ MUTANTS = [
     ("Extern Specs: Extern Structs", "src/list.rs", "    #[refined_by(elems: Set<T>)]\n    struct BTreeSet", "    #[refined_by(size: int)]\n    struct BTreeSet"),
     ("Extern Specs: Extern Impls", "src/list.rs", "T[@value]) -> bool[!set_is_in(value, s)]", "T[@value]) -> bool[set_is_in(value, s)]"),
     ("Extern Specs: Extern Traits", "src/list.rs", "#[spec(fn() -> Self{value: <Self as Default>::is_default(value)})]", "#[spec(fn() -> Self)]"),
-    ("`for` loops with range `i..j`", "src/list.rs", "for i in 0..self.len() {\n            visit(i);", "for i in 0..=self.len() {\n            visit(i);"),
+    ("Extern Specs: `for` loops with range `i..j`", "src/list.rs", "for i in 0..self.len() {\n            visit(i);", "for i in 0..=self.len() {\n            visit(i);"),
     ("Associated Refinements: Basic", "src/list.rs", "{ set_is_in(index, picks.picked) })]", "{ !set_is_in(index, picks.picked) })]"),
     ("Associated Refinements: Check Subtyping at Impl", "src/list.rs", "    #[spec(fn(&StatusSet[@set], Status[@status]) -> bool[set.bits & bit_of(status) != 0])]\n    fn has", "    #[spec(fn(&StatusSet[@set], Status[@status]) -> bool)]\n    fn has"),
     ("Associated Refinements: Associated Types", "src/list.rs", "{ set.bits & bit_of(status) != 0 })]\nimpl Selection for StatusSet", "{ set.bits & bit_of(status) == 0 })]\nimpl Selection for StatusSet"),
+    ("Associated Refinements: Refined Associated Types", "src/list.rs", "-> bool[set_is_in(index, picks.picked)])]\n    fn has(&self, index: usize)", "-> bool[!set_is_in(index, picks.picked)])]\n    fn has(&self, index: usize)"),
     ("Associated Refinements: Default", "src/list.rs", "#[assoc(fn need(selection: Self) -> int { 0 })]", "#[assoc(fn need(selection: Self) -> int { 1 })]"),
     ("Associated Refinements: Use in Extern Spec", "src/list.rs", "{ index < list.len })]", "{ index <= list.len })]"),
     ("Checking Overflows", "Cargo.toml", 'check_overflow = "strict"', 'check_overflow = "none"'),
     ("Extensible Properties for Primitive Ops", "src/list.rs", "(x == 1 && y == 2 => [<<](x, y) == 4)", "(x == 1 && y == 2 => [<<](x, y) == 8)"),
     ("Casting Sorts", "src/list.rs", "cast(c) - cast('0')", "cast(c) - cast('1')"),
-    ("Detached Specifications", "src/list.rs", "-> bool[a == b];", "-> bool[a != b];"),
+    ("Detached Specifications: Function Types", "src/main.rs", "-> Result<Vec<usize{i: i < n}>, String>;", "-> Result<Vec<usize{i: i <= n}>, String>;"),
+    ("Detached Specifications: Structs", "src/list.rs", "        bits: {BV32[bits] | only_status_bits(bits)},", "        bits: BV32,"),
+    ("Detached Specifications: Traits", "src/list.rs", "    trait Choice {\n        fn of(&Self, list: &TodoList[@n]) -> Option<usize{i: i < n}>;", "    trait Choice {\n        fn of(&Self, list: &TodoList[@n]) -> Option<usize>;"),
+    ("Detached Specifications: Inherent Impls", "src/list.rs", "-> bool[bits & bit_of(status) != 0];", "-> bool[bits & bit_of(status) == 0];"),
+    ("Detached Specifications: Trait Impls", "src/list.rs", "-> bool[a == b];", "-> bool[a != b];"),
     ("Include Patterns", "Cargo.toml", 'include_trusted = ["src/rvec.rs"]\n', ""),
     ("Scraping Qualifiers", "src/main.rs", '#[opts(scrape_quals = "true")]\n', ""),
     ("Invariant Macro", "src/main.rs", "        invariant!(width: int, rest: int; width <= total - rest + 1);\n", ""),
     ("Qualifier Macro", "src/list.rs", "            qualifier!(left: int, taken: int, all: int; left + taken == all);\n", ""),
     ("Uninterpreted Operators", "src/rejected.rs", '#[opts(uif_ops = "*,/")]\n', ""),
 ]
+
+
+GUIDE = "https://raw.githubusercontent.com/flux-rs/flux/{rev}/book/src/guide/specifications.md"
+
+# What the guide names that the code does not reflect, and why.
+NOT_REFLECTED = {
+    "Refined Vectors `rvec`: Binary Search": "an example program, not a capability",
+    "Refined Vectors `rvec`: Heapsort": "an example program, not a capability",
+    "Refined `Vec`: Standalone": "an example program, not a capability",
+    "Type Aliases: Note": "a remark",
+    "Spec Function Definitions: No Cycles!": "a restriction: what Flux refuses, with nothing to use",
+    "Generic Refinements: Hindley Refinements": "the guide says TODO and shows nothing",
+    "Detached Specifications: Enums": "the one refined enum, Command, shows the attribute form; an enum takes one form or the other",
+    "Const Generics: Refining Struct Fields": "no struct here has a const parameter; the arrays `tally` builds carry N themselves",
+}
+
+
+def guide_sections() -> list[str]:
+    """Every `##` and `###` heading and bold sub-item of the guide, as a path."""
+    rev = re.search(r'flux-rs = .*rev = "(\w+)"', pathlib.Path("Cargo.toml").read_text()).group(1)
+    with urllib.request.urlopen(GUIDE.format(rev=rev)) as page:
+        text = page.read().decode()
+    sections, h2, h3 = [], "", ""
+    for found in re.finditer(r"^(##|###) (.+)$|^\*\*([^*]+)\*\*$", text, re.M):
+        marks, heading, item = found.groups()
+        if marks == "##":
+            h2, h3 = heading, ""
+        elif marks == "###":
+            h3 = heading
+        sections.append(": ".join(part for part in (h2, "" if marks == "##" else h3, item) if part))
+    return sections
+
+
+def unchecked_sections() -> list[str]:
+    """The guide sections with neither a mutant nor a reason to have none."""
+    names = [mutant[0] for mutant in MUTANTS]
+    return [
+        section
+        for section in guide_sections()
+        if section not in NOT_REFLECTED
+        and not any(name == section or name.startswith(section + ": ") for name in names)
+    ]
 
 
 def flux() -> tuple[bool, str]:
@@ -112,6 +166,13 @@ def flux() -> tuple[bool, str]:
 
 def main() -> int:
     wanted = sys.argv[1] if len(sys.argv) > 1 else ""
+    if wanted in ("", "--sections"):
+        missing = unchecked_sections()
+        for section in missing:
+            print(f"NO MUTANT {section}")
+        print(f"{len(missing)} guide sections without a mutant, {len(NOT_REFLECTED)} not reflected")
+        if missing or wanted:
+            return 1 if missing else 0
     accepted, ignored = flux()
     if not accepted:
         print("the program does not verify as it is; fix that first")

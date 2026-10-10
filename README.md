@@ -60,7 +60,7 @@ a runtime panic or a silently wrong file.
 | Extern specs: a struct and its methods, a free function, a primitive type, a trait | What `BTreeSet`, `std::cmp::max`, `char::to_digit` and `Default` promise; a todo starts open | `set_specs`, `cmp_specs`, `char_specs`, `default_specs` |
 | Include patterns | The refined vector's file is the trusted base, named once | `Cargo.toml` (`include_trusted`) |
 | A refined vector (`RVec`) | Reading a todo at a proved index cannot panic | `src/rvec.rs` |
-| Detached specs, `trusted_derive` | `==` on statuses is true exactly for equal statuses | `Status` |
+| Detached specs, `trusted_derive` | Specs stated beside the code and not on it: for a derived `==` (trait impl), a function, a struct and its impl, a trait | `Status`, `indexes_of`, `StatusSet`, `Choice` |
 | Opaque structs, trusted functions | A title is never blank | `Title`, `RVec` |
 | Type holes (`_`) in signatures, fields, variants and aliases | A spec names only the part it is about | `split_priority`, `parse`, `Picks`, `Command`, `Removed` |
 | Refined `impl Trait` | Every priority an iterator yields is a priority | `priorities` |
@@ -87,15 +87,22 @@ a runtime panic or a silently wrong file.
 The table follows the sections of the
 [specifications guide](https://flux-rs.github.io/flux/guide/specifications.html);
 each has a use in the code, and a proof that rests on that use.
-`mutants.py` is the check: for every section it breaks the one line that
-uses the capability, runs Flux, and expects the program to be rejected. A
+`mutants.py` is the check. It first reads the guide itself, at the Flux
+revision `Cargo.toml` pins, and requires every heading and named sub-item
+in it to have a mutant, or to be listed in `NOT_REFLECTED` with the reason:
+98 sections, 8 of them not reflected (three example programs, a remark, a
+restriction, a part the guide leaves as TODO, and two forms the code has no
+place for: a detached spec of an enum and a const parameter in a struct
+field). Then for every section it breaks the one line that uses the
+capability, runs Flux, and expects the program to be rejected. A
 line that can be broken without Flux noticing is doing no work, and a line
 that is gone is reported too, so a refactor cannot quietly drop a
 capability.
 
 ```
-uv run mutants.py        # all 78 mutants, about six minutes
-uv run mutants.py Sets   # only the sections whose name contains "Sets"
+uv run mutants.py             # the sections, then all 84 mutants: about six minutes
+uv run mutants.py Sets        # only the sections whose name contains "Sets"
+uv run mutants.py --sections  # only the comparison with the guide, one second
 ```
 
 Three things it is fair to say about what that shows:
