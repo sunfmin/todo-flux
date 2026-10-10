@@ -496,6 +496,7 @@ mod vec_specs {
 /// in and which is not; `need` is the shortest list all of them are in.
 #[opaque]
 #[refined_by(picked: Set<int>, need: int)]
+#[invariant(need >= 0)]
 pub struct Picks(BTreeSet<usize>);
 
 impl Picks {

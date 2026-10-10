@@ -169,3 +169,9 @@ fn priority_change_that_also_reopens_the_todo(todo: &mut Todo, priority: Priorit
     todo.priority = priority;
     todo.status = Status::Open;
 }
+
+#[should_fail]
+#[spec(fn(&Command[@c]) -> bool[c.need > 0])]
+fn every_command_claimed_to_need_a_todo(_command: &Command) -> bool {
+    true
+}

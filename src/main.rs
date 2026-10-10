@@ -56,8 +56,10 @@ defs! {
 /// What the user asked for, with every todo number already turned into an
 /// index. The refinement `need` is the shortest list the command can run on,
 /// so a command that `parse` checked against a list runs on it with no
-/// further checks.
+/// further checks. The invariant holds for every variant: no command needs
+/// a list of negative length, so every command runs on some list.
 #[refined_by(need: int)]
+#[invariant(need >= 0)]
 enum Command {
     #[variant((StatusSet) -> Command[0])]
     List(StatusSet),
@@ -75,6 +77,15 @@ enum Command {
     Move(usize, usize),
     #[variant((Picks[@picks]) -> Command[picks.need])]
     Remove(Picks),
+}
+
+/// Proved from the invariant alone, for a command built any way at all.
+/// Only Flux compiles this.
+#[cfg(flux)]
+#[allow(dead_code)]
+#[spec(fn(&Command[@c]) -> bool[c.need >= 0])]
+fn no_command_needs_a_negative_length(_command: &Command) -> bool {
+    true
 }
 
 /// Runs one command, writing what the user should see to `out`. Taking the
