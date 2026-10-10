@@ -53,12 +53,12 @@ fn add_done_undo_rm_round_trip() {
     cli.ok(&["add", "write report"]);
     assert_eq!(
         cli.ok(&["list"]),
-        " 1. [ ] !2 buy milk\n 2. [ ] !2 write report\n0/2 done (0%), 2 left\n"
+        " 1. [ ] !2 buy milk\n 2. [ ] !2 write report\n0/2 done (0%), 2 left\n  0 open at !1\n  2 open at !2\n  0 open at !3\n"
     );
 
     assert_eq!(
         cli.ok(&["done", "2"]),
-        " 1. [ ] !2 buy milk\n 2. [x] !2 write report\n1/2 done (50%), 1 left\n"
+        " 1. [ ] !2 buy milk\n 2. [x] !2 write report\n1/2 done (50%), 1 left\n  0 open at !1\n  1 open at !2\n  0 open at !3\n"
     );
     assert_eq!(cli.stored(), "[ ] !2 buy milk\n[x] !2 write report\n");
 
@@ -67,7 +67,7 @@ fn add_done_undo_rm_round_trip() {
 
     assert_eq!(
         cli.ok(&["rm", "1"]),
-        "removed: buy milk\n 1. [ ] !2 write report\n0/1 done (0%), 1 left\n"
+        "removed: buy milk\n 1. [ ] !2 write report\n0/1 done (0%), 1 left\n  0 open at !1\n  1 open at !2\n  0 open at !3\n"
     );
     assert_eq!(cli.stored(), "[ ] !2 write report\n");
 
@@ -86,6 +86,14 @@ fn priority_is_set_and_kept_in_range() {
     assert_eq!(cli.stored(), "[ ] !1 a\n");
     cli.ok(&["pri", "1", "3"]);
     assert_eq!(cli.stored(), "[ ] !3 a\n");
+
+    cli.ok(&["add", "b"]);
+    cli.ok(&["done", "2"]);
+    assert!(
+        cli.ok(&["pri", "2", "1"])
+            .ends_with("  0 open at !1\n  0 open at !2\n  1 open at !3\n")
+    );
+    cli.ok(&["rm", "2"]);
 
     for level in ["0", "4", "-1", "high", "300"] {
         assert!(!cli.run(&["pri", "1", level]).status.success(), "{level}");
