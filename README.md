@@ -47,7 +47,7 @@ a runtime panic or a silently wrong file.
 | A trait of our own with a defaulted associated refinement | A selection by number must fit the list; one by status fits any list | `Selection` |
 | Refined associated types | What a selection holds is said over the thing it chooses by, a number or a status, and each implementation is checked against it | `Selection::By` |
 | Sets | Which numbers were picked: none can be picked twice | `Picks` |
-| Bitvectors, bitvector constants | A set of statuses never holds a bit that is not a status, and behaves like a set | `StatusSet`, `STATUS_BITS` |
+| Bitvectors, bitvector constants and extensions | A set of statuses never holds a bit that is not a status, behaves like a set, and stays one in a wider word | `StatusSet`, `STATUS_BITS`, `status_set_theorems` |
 | Properties for primitive operators | A status's bit is `1 << slot`, so the bits follow the slots | `OneShiftedToASlot`, `Status::bit` |
 | Uninterpreted operators (`uif_ops`) | The counting loop's indexes are proved in bounds with `+` treated as unknown, so the proof does not lean on its unchecked additions; the percent bound, by contrast, is unprovable without `*` and `/` | `TodoList::tally`, `src/rejected.rs` |
 | `char` literals, sort casts | The priority in a line is one digit, and it is read as the number it stands for | `priority_digit` |
@@ -61,7 +61,7 @@ a runtime panic or a silently wrong file.
 | A refined vector (`RVec`) | Reading a todo at a proved index cannot panic | `src/rvec.rs` |
 | Detached specs, `trusted_derive` | `==` on statuses is true exactly for equal statuses | `Status` |
 | Opaque structs, trusted functions | A title is never blank | `Title`, `RVec` |
-| Type holes (`_`) | A spec names only the part it is about | `split_priority`, `parse` |
+| Type holes (`_`) in signatures, fields, variants and aliases | A spec names only the part it is about | `split_priority`, `parse`, `Picks`, `Command`, `Removed` |
 | Refined `impl Trait` and `dyn Trait` | Every priority an iterator yields is a priority; output goes to any writer | `priorities`, `run` |
 | `ignore` | The one function with no rule to check is left out | `main` |
 | Overflow checking (`strict`, whole crate; `opts` for one function) | No arithmetic overflows or underflows, no division by zero | `Cargo.toml` |
