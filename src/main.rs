@@ -37,59 +37,93 @@ fn main() -> ExitCode {
     }
 }
 
+/// What the user asked for, with every todo number already turned into an
+/// index. The refinement `need` is the shortest list the command can run on,
+/// so a command that `parse` checked against a list runs on it with no
+/// further checks.
+#[refined_by(need: int)]
+enum Command {
+    #[variant((Option<Status>) -> Command[0])]
+    List(Option<Status>),
+    #[variant(Command[0])]
+    Help,
+    #[variant((Title) -> Command[0])]
+    Add(Title),
+    #[variant((usize[@index], Status) -> Command[index + 1])]
+    SetStatus(usize, Status),
+    #[variant((usize[@index], Priority) -> Command[index + 1])]
+    SetPriority(usize, Priority),
+    #[variant((usize[@from], usize[@to]) -> Command[if from > to { from + 1 } else { to + 1 }])]
+    Move(usize, usize),
+    #[variant((usize[@index]) -> Command[index + 1])]
+    Remove(usize),
+}
+
 fn run(args: &[String]) -> Result<(), String> {
-    let (command, rest) = match args.split_first() {
-        Some((command, rest)) => (command.as_str(), rest),
-        None => ("list", args),
-    };
     let path = todo_file()?;
     let mut list = load(&path)?;
 
-    match (command, rest) {
-        ("list", []) => {
-            print_list(&list, None);
+    match parse(&list, args)? {
+        Command::List(only) => {
+            print_list(&list, only);
             return Ok(());
         }
-        ("list", [name]) => {
-            let Some(status) = Status::named(name) else {
-                return Err(format!("'{name}' is not open, doing or done"));
-            };
-            print_list(&list, Some(status));
-            return Ok(());
-        }
-        ("help" | "-h" | "--help", _) => {
+        Command::Help => {
             println!("{USAGE}");
             return Ok(());
         }
-        ("add", words) => {
-            let Some(title) = Title::new(&words.join(" ")) else {
-                return Err("add needs a title".to_string());
-            };
-            list.add(title);
+        Command::Add(title) => list.add(title),
+        Command::SetStatus(index, to) => {
+            if !list.set_status(index, to) {
+                let todo = list.get(index);
+                return Err(format!(
+                    "'{}' is {} and cannot become {}; undo it first",
+                    todo.title.as_str(),
+                    todo.status.name(),
+                    to.name()
+                ));
+            }
         }
-        ("start", [n]) => change_status(&mut list, n, Status::Doing)?,
-        ("done", [n]) => change_status(&mut list, n, Status::Done)?,
-        ("undo", [n]) => change_status(&mut list, n, Status::Open)?,
-        ("pri", [n, level]) => {
-            let index = index_of(&list, n)?;
-            list.set_priority(index, priority_of(level)?);
-        }
-        ("mv", [n, m]) => {
-            let from = index_of(&list, n)?;
-            let to = index_of(&list, m)?;
-            list.move_to(from, to);
-        }
-        ("rm", [n]) => {
-            let index = index_of(&list, n)?;
-            println!("removed: {}", list.remove(index).title.as_str());
-        }
-        _ => return Err(format!("cannot run '{}'\n{USAGE}", args.join(" "))),
+        Command::SetPriority(index, priority) => list.set_priority(index, priority),
+        Command::Move(from, to) => list.move_to(from, to),
+        Command::Remove(index) => println!("removed: {}", list.remove(index).title.as_str()),
     }
 
     fs::write(&path, list.to_text())
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
     print_list(&list, None);
     Ok(())
+}
+
+/// Reads the arguments as a command that `list` is long enough for.
+#[spec(fn(&TodoList[@n], &[String]) -> Result<Command{c: c.need <= n}, String>)]
+fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
+    let (name, rest) = match args.split_first() {
+        Some((name, rest)) => (name.as_str(), rest),
+        None => ("list", args),
+    };
+    match (name, rest) {
+        ("list", []) => Ok(Command::List(None)),
+        ("list", [status]) => match Status::named(status) {
+            Some(status) => Ok(Command::List(Some(status))),
+            None => Err(format!("'{status}' is not open, doing or done")),
+        },
+        ("help" | "-h" | "--help", _) => Ok(Command::Help),
+        ("add", words) => match Title::new(&words.join(" ")) {
+            Some(title) => Ok(Command::Add(title)),
+            None => Err("add needs a title".to_string()),
+        },
+        ("start", [n]) => Ok(Command::SetStatus(index_of(list, n)?, Status::Doing)),
+        ("done", [n]) => Ok(Command::SetStatus(index_of(list, n)?, Status::Done)),
+        ("undo", [n]) => Ok(Command::SetStatus(index_of(list, n)?, Status::Open)),
+        ("pri", [n, level]) => Ok(Command::SetPriority(
+            index_of(list, n)?,
+            priority_of(level)?,
+        )),
+        ("mv", [n, m]) => Ok(Command::Move(index_of(list, n)?, index_of(list, m)?)),
+        ("rm", [n]) => Ok(Command::Remove(index_of(list, n)?)),
+        _ => Err(format!("cannot run '{}'\n{USAGE}", args.join(" "))),
+    }
 }
 
 fn todo_file() -> Result<PathBuf, String> {
@@ -121,19 +155,6 @@ fn index_of(list: &TodoList, arg: &str) -> Result<usize, String> {
         Some(index) => Ok(index),
         None => Err(format!("no todo {pos} (the list has {})", list.len())),
     }
-}
-
-fn change_status(list: &mut TodoList, arg: &str, to: Status) -> Result<(), String> {
-    let index = index_of(list, arg)?;
-    if list.set_status(index, to) {
-        return Ok(());
-    }
-    let from = list.get(index).status;
-    Err(format!(
-        "todo {arg} is {} and cannot become {}; undo it first",
-        from.name(),
-        to.name()
-    ))
 }
 
 #[spec(fn(&str) -> Result<Priority, String>)]

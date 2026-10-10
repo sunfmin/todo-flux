@@ -8,7 +8,10 @@
 
 use flux_rs::{attrs::*, defs};
 
-use crate::list::{Progress, Status, Title, Todo, TodoList};
+use crate::{
+    Command,
+    list::{Progress, Status, Title, Todo, TodoList},
+};
 
 defs! {
     use crate::list::can_become;
@@ -90,4 +93,17 @@ fn title_with_nothing_on_it(title: &Title) -> usize {
 #[should_fail]
 fn percent_multiplied_in_usize(progress: &Progress) -> usize {
     progress.done * 100
+}
+
+#[should_fail]
+fn command_run_on_a_list_it_was_not_checked_against(list: &mut TodoList, command: Command) {
+    if let Command::Remove(index) = command {
+        list.set_status(index, Status::Done);
+    }
+}
+
+#[should_fail]
+#[spec(fn(&TodoList[@n], usize{i: i <= n}) -> Command{c: c.need <= n})]
+fn command_for_one_past_the_end(_list: &TodoList, index: usize) -> Command {
+    Command::Remove(index)
 }
