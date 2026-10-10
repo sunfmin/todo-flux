@@ -216,3 +216,12 @@ fn percent_bound_claimed_without_what_times_and_divide_compute(progress: &Progre
 fn range_that_leaves_out_its_last_number(first: usize, last: usize) -> Vec<usize> {
     crate::span(first, last)
 }
+
+#[should_fail]
+#[spec(fn(&mut std::collections::BTreeSet<usize, std::alloc::Global>, usize) -> bool[true])]
+fn any_number_claimed_new_to_a_std_set(
+    set: &mut std::collections::BTreeSet<usize>,
+    n: usize,
+) -> bool {
+    set.insert(n)
+}
