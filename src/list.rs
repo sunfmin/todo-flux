@@ -233,10 +233,8 @@ impl TodoList {
     where
         F: FnMut(usize),
     {
-        let mut i = 0;
-        while i < self.len() {
+        for i in 0..self.len() {
             visit(i);
-            i += 1;
         }
     }
 
@@ -298,13 +296,11 @@ impl TodoList {
     pub fn progress(&self) -> Progress {
         let total = self.len();
         let mut done = 0;
-        let mut i = 0;
-        while i < total {
-            invariant!(done: int; done <= i && i <= total);
+        for i in 0..total {
+            invariant!(done: int; done <= i);
             if self.get(i).status.is_done() {
                 done += 1;
             }
-            i += 1;
         }
         Progress { done, total }
     }

@@ -171,10 +171,8 @@ fn print_list(list: &TodoList, only: Option<Status>) {
         progress.left()
     );
     let open = list.open_by_priority();
-    let mut level = 0;
-    while level < open.len() {
+    for (level, count) in open.iter().enumerate() {
         let priority = HIGHEST_PRIORITY as usize + level;
-        println!("  {} open at !{priority}", open[level]);
-        level += 1;
+        println!("  {count} open at !{priority}");
     }
 }
