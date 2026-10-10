@@ -4,7 +4,7 @@
 //! indexing, `set_status` or `move_to` is proved in bounds at compile time. The
 //! only way to obtain such an index from untrusted input is `locate`.
 
-use std::{cmp::min, collections::BTreeSet, ops::Index};
+use std::{collections::BTreeSet, ops::Index};
 
 use flux_rs::{attrs::*, bitvec::BV32, defs, macros::qualifier};
 
@@ -360,17 +360,19 @@ mod status_set_theorems {
     }
 }
 
-/// What std's `min` keeps. The spec is generic in what is known about the
-/// two values: whatever property `p` both have, the result has too, so the
-/// smaller of two priorities is a priority and nothing here mentions
-/// priorities. Only Flux reads this.
+/// The more urgent of two priorities. The spec is generic in what is known
+/// about the two numbers: whatever property `p` both have, the answer has
+/// too, besides being no larger than either. So the more urgent of two
+/// priorities is a priority, and nothing here mentions priorities.
+#[spec(fn[hrn p: int -> bool](a: u8{p(a)}, b: u8{p(b)}) -> u8{v: p(v) && v <= a && v <= b})]
+pub fn more_urgent(a: u8, b: u8) -> u8 {
+    if a < b { a } else { b }
+}
+
+/// What std's `max` gives. Only Flux reads this.
 #[cfg(flux)]
 mod cmp_specs {
     use flux_rs::attrs::*;
-
-    #[extern_spec(std::cmp)]
-    #[spec(fn[hrn p: T -> bool](T{v: p(v)}, T{v: p(v)}) -> T{v: p(v)})]
-    fn min<T: Ord>(a: T, b: T) -> T;
 
     // The larger of two values is what their type's `Ord` says it is. For
     // `usize` that is the larger number exactly, so a caller knows it is no
@@ -862,20 +864,26 @@ impl TodoList {
         self.items.as_slice()
     }
 
-    /// The todo to work on next: the first one not done among those of the
-    /// most urgent priority that has any, or `None` when everything is done.
-    #[spec(fn(&TodoList[@n]) -> Option<usize{i: i < n}>)]
-    pub fn next(&self) -> Option<usize> {
-        let mut most_urgent: Option<Priority> = None;
+    /// The most urgent priority any todo not done has.
+    #[spec(fn(&TodoList) -> Option<Priority>)]
+    fn most_urgent_left(&self) -> Option<Priority> {
+        let mut most_urgent = None;
         for todo in self.todos().iter() {
             if !todo.status.is_done() {
                 most_urgent = Some(match most_urgent {
-                    Some(priority) => min(priority, todo.priority),
+                    Some(priority) => more_urgent(priority, todo.priority),
                     None => todo.priority,
                 });
             }
         }
-        let wanted = most_urgent?;
+        most_urgent
+    }
+
+    /// The todo to work on next: the first one not done among those of the
+    /// most urgent priority that has any, or `None` when everything is done.
+    #[spec(fn(&TodoList[@n]) -> Option<usize{i: i < n}>)]
+    pub fn next(&self) -> Option<usize> {
+        let wanted = self.most_urgent_left()?;
         for (i, todo) in self.todos().iter().enumerate() {
             if !todo.status.is_done() && todo.priority == wanted {
                 return Some(i);

@@ -215,7 +215,7 @@ const USES: &[(&str, &str, &str)] = &[
     (
         "Generic Refinements",
         "src/list.rs",
-        "fn[hrn p: T -> bool](T{v: p(v)}, T{v: p(v)}) -> T{v: p(v)}",
+        "fn[hrn p: int -> bool](a: u8{p(a)}, b: u8{p(b)}) -> u8{v: p(v) && v <= a && v <= b}",
     ),
     (
         "Bitvector Refinements: Operators",
@@ -246,7 +246,7 @@ const USES: &[(&str, &str, &str)] = &[
     (
         "Extern Specs: Extern Functions",
         "src/list.rs",
-        "fn min<T: Ord>(a: T, b: T) -> T;",
+        "fn max<T: Ord>(a: T, b: T) -> T;",
     ),
     (
         "Extern Specs: Options",

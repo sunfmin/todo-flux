@@ -56,8 +56,8 @@ a runtime panic or a silently wrong file.
 | Uninterpreted functions | A text makes a title exactly when it is not blank, whatever "blank" computes | `blank`, `Title::new` |
 | Hidden and revealed definitions | Other proofs rely on the status rule holding, not on what it says | `can_become` |
 | `forall` preconditions, bounded quantifiers | Theorems: no status is a dead end; no priority slot is spare | `status_theorems` |
-| Generic (abstract) refinements | The smaller of two priorities is a priority, said once for every type | `cmp_specs` |
-| Extern specs: a struct and its methods, a free function, a primitive type, a trait | What `BTreeSet`, `std::cmp::min`, `char::to_digit` and `Default` promise; a todo starts open | `set_specs`, `cmp_specs`, `char_specs`, `default_specs` |
+| Generic (abstract) refinements | The more urgent of two priorities is a priority, from a spec that never mentions priorities: whatever both numbers satisfy, the answer does | `more_urgent`, `TodoList::most_urgent_left` |
+| Extern specs: a struct and its methods, a free function, a primitive type, a trait | What `BTreeSet`, `std::cmp::max`, `char::to_digit` and `Default` promise; a todo starts open | `set_specs`, `cmp_specs`, `char_specs`, `default_specs` |
 | Include patterns | The refined vector's file is the trusted base, named once | `Cargo.toml` (`include_trusted`) |
 | A refined vector (`RVec`) | Reading a todo at a proved index cannot panic | `src/rvec.rs` |
 | Detached specs, `trusted_derive` | `==` on statuses is true exactly for equal statuses | `Status` |

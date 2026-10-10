@@ -184,8 +184,11 @@ fn removal_claimed_to_keep_the_list_whole(list: &mut TodoList, picks: &Picks) {
 
 #[should_fail]
 #[spec(fn(Priority, u8) -> Priority)]
-fn smaller_of_a_priority_and_any_number_claimed_a_priority(priority: Priority, n: u8) -> Priority {
-    std::cmp::min(priority, n)
+fn more_urgent_of_a_priority_and_any_number_claimed_a_priority(
+    priority: Priority,
+    n: u8,
+) -> Priority {
+    crate::list::more_urgent(priority, n)
 }
 
 #[should_fail]
