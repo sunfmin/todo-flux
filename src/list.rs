@@ -571,20 +571,47 @@ mod picks_theorems {
 /// `need` is the shortest list the choice can be made from. Unless an
 /// implementation says otherwise that is no length at all: a choice by what
 /// the todos are fits any list.
+///
+/// `By` is what a todo is chosen by, its number or its status, and `holds`
+/// says in the specs which of those a selection holds. Each implementation
+/// defines it, and Flux checks its `has` answers exactly that.
 #[assoc(fn need(selection: Self) -> int { 0 })]
+#[assoc(fn holds(selection: Self, by: Self::By) -> bool)]
 pub trait Selection {
-    fn has(&self, index: usize, todo: &Todo) -> bool;
+    type By;
+
+    /// What `todo`, at `index` in its list, would be chosen by.
+    fn key(index: usize, todo: &Todo) -> Self::By;
+
+    #[spec(fn(&Self[@selection], Self::By[@by]) -> bool[<Self as Selection>::holds(selection, by)])]
+    fn has(&self, by: Self::By) -> bool;
 }
 
+#[assoc(fn holds(set: StatusSet, status: Status) -> bool { set.bits & bit_of(status) != 0 })]
 impl Selection for StatusSet {
-    fn has(&self, _index: usize, todo: &Todo) -> bool {
-        self.contains(todo.status)
+    type By = Status;
+
+    fn key(_index: usize, todo: &Todo) -> Status {
+        todo.status
+    }
+
+    #[spec(fn(&StatusSet[@set], Status[@status]) -> bool[set.bits & bit_of(status) != 0])]
+    fn has(&self, status: Status) -> bool {
+        self.contains(status)
     }
 }
 
 #[assoc(fn need(picks: Picks) -> int { picks.need })]
+#[assoc(fn holds(picks: Picks, index: int) -> bool { set_is_in(index, picks.picked) })]
 impl Selection for Picks {
-    fn has(&self, index: usize, _todo: &Todo) -> bool {
+    type By = usize;
+
+    fn key(index: usize, _todo: &Todo) -> usize {
+        index
+    }
+
+    #[spec(fn(&Picks[@picks], usize[@index]) -> bool[set_is_in(index, picks.picked)])]
+    fn has(&self, index: usize) -> bool {
         self.contains(index)
     }
 }
@@ -806,7 +833,7 @@ impl TodoList {
             // the todos left and the todos taken add up to the original list.
             qualifier!(left: int, taken: int, all: int; left + taken == all);
             index -= 1;
-            if chosen.has(index, &self.items[index]) {
+            if chosen.has(S::key(index, &self.items[index])) {
                 removed.push(self.items.remove(index));
             }
         }
