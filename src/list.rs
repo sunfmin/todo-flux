@@ -19,6 +19,10 @@ pub const PRIORITY_LEVELS: usize = (LOWEST_PRIORITY - HIGHEST_PRIORITY + 1) as u
 defs! {
     fn is_priority(p: int) -> bool { HIGHEST_PRIORITY <= p && p <= LOWEST_PRIORITY }
     fn is_position(pos: int, len: int) -> bool { 1 <= pos && pos <= len }
+    // How each status starts a line of the text format.
+    fn mark_of(status: Status) -> str {
+        if status == Status::Open { "[ ] " } else if status == Status::Doing { "[~] " } else { "[x] " }
+    }
     // A finished todo must be reopened before it can be worked on again.
     // Hidden: other code may rely on the rule holding, not on what it says,
     // so the rule can change without any other proof having to.
@@ -80,6 +84,7 @@ impl Status {
 
     /// How the status starts a line of the text format.
     #[no_panic]
+    #[spec(fn(&Status[@status]) -> &str[mark_of(status)])]
     fn mark(&self) -> &'static str {
         match self {
             Status::Open => "[ ] ",
@@ -161,6 +166,7 @@ mod status_theorems {
 
     defs! {
         use super::can_become;
+        use super::mark_of;
     }
 
     /// Whatever its status, a todo can always be reopened and always be
@@ -169,9 +175,19 @@ mod status_theorems {
     #[spec(fn() requires forall s. can_become(s, Status::Open) && can_become(s, Status::Done))]
     fn no_status_is_a_dead_end() {}
 
+    /// Two statuses never share a mark, so the mark at the start of a line
+    /// in the file says which status it is.
+    #[trusted(reason = "a statement, not code: whoever calls it must prove it")]
+    #[spec(fn() requires forall s.
+        (mark_of(s) == mark_of(Status::Open) => s == Status::Open)
+        && (mark_of(s) == mark_of(Status::Doing) => s == Status::Doing)
+        && (mark_of(s) == mark_of(Status::Done) => s == Status::Done))]
+    fn marks_tell_statuses_apart() {}
+
     #[reveal(can_become)]
     fn proofs() {
         no_status_is_a_dead_end();
+        marks_tell_statuses_apart();
     }
 }
 
