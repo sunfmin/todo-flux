@@ -5,6 +5,8 @@ extern crate flux_alloc;
 extern crate flux_core;
 
 mod list;
+#[cfg(flux)]
+mod rejected;
 
 use std::{env, fs, io, path::PathBuf, process::ExitCode};
 
