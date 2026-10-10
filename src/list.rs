@@ -261,6 +261,23 @@ impl Todo {
         })
     }
 
+    /// The slot of this todo in `TodoList::open_by_priority`: its priority's,
+    /// unless it is done and so not counted.
+    #[spec(fn(&Todo) -> Option<usize{slot: slot < PRIORITY_LEVELS}>)]
+    fn open_priority_slot(&self) -> Option<usize> {
+        if self.status.is_done() {
+            None
+        } else {
+            Some(slot(self.priority))
+        }
+    }
+
+    /// The slot of this todo in `TodoList::by_status`.
+    #[spec(fn(&Todo) -> Option<usize{slot: slot < STATUSES}>)]
+    fn status_slot(&self) -> Option<usize> {
+        Some(self.status.slot())
+    }
+
     /// Moves the todo to another status if the rules allow it, and says
     /// whether it did. Flux checks this against the rules: it moves exactly
     /// when `can_become` holds and otherwise leaves the status alone.
@@ -449,36 +466,26 @@ impl TodoList {
 
     /// How many open todos there are at each priority, highest first.
     pub fn open_by_priority(&self) -> [usize; PRIORITY_LEVELS] {
-        self.tally(|index| {
-            let todo = &self[index];
-            if todo.status.is_done() {
-                None
-            } else {
-                Some(slot(todo.priority))
-            }
-        })
+        self.tally(Todo::open_priority_slot)
     }
 
     /// How many todos there are in each status, in the order of `Status::ALL`.
     pub fn by_status(&self) -> [usize; STATUSES] {
-        self.tally(|index| Some(self[index].status.slot()))
+        self.tally(Todo::status_slot)
     }
 
-    /// Counts todos into `N` slots: `slot_at` says which slot the todo at an
-    /// index goes to, or `None` to leave it out. It works for any number of
-    /// slots because the slot's type is tied to the array's length.
+    /// Counts todos into `N` slots: `slot_of` says which slot a todo goes
+    /// to, or `None` to leave it out. It works for any number of slots
+    /// because the type of the function passed in is tied to the array's
+    /// length.
     // No count can pass the list's length, but that needs a fact about every
     // element of the array on every turn of the loop, which Flux cannot infer.
     #[opts(check_overflow = "none")]
-    #[spec(fn(&TodoList[@n], slot_at: F) -> [usize; N]
-           where F: FnMut(usize{i: i < n}) -> Option<usize{slot: slot < N}>)]
-    fn tally<const N: usize, F>(&self, mut slot_at: F) -> [usize; N]
-    where
-        F: FnMut(usize) -> Option<usize>,
-    {
+    #[spec(fn(&TodoList, slot_of: fn(&Todo) -> Option<usize{slot: slot < N}>) -> [usize; N])]
+    fn tally<const N: usize>(&self, slot_of: fn(&Todo) -> Option<usize>) -> [usize; N] {
         let mut counts = [0; N];
         for i in 0..self.len() {
-            if let Some(slot) = slot_at(i) {
+            if let Some(slot) = slot_of(&self[i]) {
                 counts[slot] += 1;
             }
         }
