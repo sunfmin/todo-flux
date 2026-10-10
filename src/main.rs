@@ -11,7 +11,7 @@ mod rejected;
 use std::{env, fs, io, path::PathBuf, process::ExitCode};
 
 use flux_rs::attrs::*;
-use list::{HIGHEST_PRIORITY, LOWEST_PRIORITY, Priority, Status, TodoList, priority};
+use list::{HIGHEST_PRIORITY, LOWEST_PRIORITY, Priority, Status, Title, TodoList, priority};
 
 const USAGE: &str = "\
 usage: todo [list]          show all todos
@@ -62,11 +62,10 @@ fn run(args: &[String]) -> Result<(), String> {
             return Ok(());
         }
         ("add", words) => {
-            let title = words.join(" ");
-            if title.trim().is_empty() {
+            let Some(title) = Title::new(&words.join(" ")) else {
                 return Err("add needs a title".to_string());
-            }
-            list.add(title.trim());
+            };
+            list.add(title);
         }
         ("start", [n]) => change_status(&mut list, n, Status::Doing)?,
         ("done", [n]) => change_status(&mut list, n, Status::Done)?,
@@ -82,7 +81,7 @@ fn run(args: &[String]) -> Result<(), String> {
         }
         ("rm", [n]) => {
             let index = index_of(&list, n)?;
-            println!("removed: {}", list.remove(index).title);
+            println!("removed: {}", list.remove(index).title.as_str());
         }
         _ => return Err(format!("cannot run '{}'\n{USAGE}", args.join(" "))),
     }

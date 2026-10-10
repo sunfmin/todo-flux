@@ -85,9 +85,48 @@ pub fn priority(n: u8) -> Option<Priority> {
     }
 }
 
+/// A todo's title: one line with something on it.
+///
+/// Flux cannot look inside a string, so the struct is opaque and its
+/// functions are trusted: this is the one place the claim "not blank" is
+/// made by hand. Everything outside is checked against it as usual.
+#[opaque]
+#[refined_by(chars: int)]
+#[invariant(chars > 0)]
+pub struct Title(String);
+
+impl Title {
+    /// Makes a title from any text, or `None` when nothing is left after
+    /// putting it on one line and trimming it.
+    #[trusted]
+    #[spec(fn(&str) -> Option<Title>)]
+    pub fn new(text: &str) -> Option<Title> {
+        let line = text.replace(['\n', '\r'], " ");
+        let line = line.trim();
+        if line.is_empty() {
+            None
+        } else {
+            Some(Title(line.to_string()))
+        }
+    }
+
+    /// Only the specs need the length, so only Flux compiles this.
+    #[cfg(flux)]
+    #[trusted]
+    #[spec(fn(&Title[@t]) -> usize[t.chars])]
+    pub fn chars(&self) -> usize {
+        self.0.chars().count()
+    }
+
+    #[trusted]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 #[refined_by(status: Status)]
 pub struct Todo {
-    pub title: String,
+    pub title: Title,
     #[field(Status[status])]
     pub status: Status,
     #[field(Priority)]
@@ -98,12 +137,17 @@ impl Todo {
     /// The todo as one line of the text format, e.g. `[x] !2 title`.
     pub fn line(&self) -> String {
         let mark = self.status.mark();
-        format!("{mark}{PRIORITY_TAG}{} {}", self.priority, self.title)
+        format!(
+            "{mark}{PRIORITY_TAG}{} {}",
+            self.priority,
+            self.title.as_str()
+        )
     }
 
     /// Inverse of `line`. A missing mark means open and a missing or invalid
-    /// priority means the default, so any hand-edited file still loads.
-    fn from_line(line: &str) -> Todo {
+    /// priority means the default, so any hand-edited file still loads. A
+    /// line with no title on it is not a todo.
+    fn from_line(line: &str) -> Option<Todo> {
         let mut status = Status::Open;
         let mut rest = line;
         for candidate in Status::ALL {
@@ -113,11 +157,11 @@ impl Todo {
             }
         }
         let (priority, title) = split_priority(rest);
-        Todo {
-            title: title.to_string(),
+        Some(Todo {
+            title: Title::new(title)?,
             status,
             priority,
-        }
+        })
     }
 
     /// Moves the todo to another status if the rules allow it, and says
@@ -204,12 +248,12 @@ impl TodoList {
         TodoList { items: Vec::new() }
     }
 
-    /// Reads the text format: one todo per line, blank lines ignored.
+    /// Reads the text format: one todo per line, lines without a title ignored.
     pub fn parse(text: &str) -> TodoList {
         let mut list = TodoList::new();
         for line in text.lines() {
-            if !line.trim().is_empty() {
-                list.push(Todo::from_line(line));
+            if let Some(todo) = Todo::from_line(line) {
+                list.push(todo);
             }
         }
         list
@@ -243,11 +287,9 @@ impl TodoList {
         self.items.len()
     }
 
-    /// Appends an open todo. The title is kept on one line because a line is
-    /// one todo in the text format.
-    #[spec(fn(self: &mut TodoList[@n], title: &str) ensures self: TodoList[n + 1])]
-    pub fn add(&mut self, title: &str) {
-        let title = title.replace(['\n', '\r'], " ");
+    /// Appends an open todo.
+    #[spec(fn(self: &mut TodoList[@n], title: Title) ensures self: TodoList[n + 1])]
+    pub fn add(&mut self, title: Title) {
         self.push(Todo {
             title,
             status: Status::Open,
