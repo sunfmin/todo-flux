@@ -84,7 +84,9 @@ a runtime panic or a silently wrong file.
 
 The table follows the sections of the
 [specifications guide](https://flux-rs.github.io/flux/guide/specifications.html);
-each has a use in the code. Some uses are small, and it is fair to say so:
+each has a use in the code. `tests/guide_coverage.rs` lists the line for
+every section and fails when a refactor removes the last use of one. Some
+uses are small, and it is fair to say so:
 
 - `uif_ops` can only take knowledge away from the solver, so it proves
   nothing new here. It shows which proofs depend on arithmetic.
