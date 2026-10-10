@@ -1,4 +1,4 @@
-//! `todo` — a command-line todo list whose index safety is verified by Flux.
+//! `todo` — a command-line todo list whose rules are verified by Flux.
 
 // Linking these crates is what brings the std refinement specs into scope.
 extern crate flux_alloc;
