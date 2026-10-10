@@ -26,6 +26,9 @@ usage: todo [list]          show all todos
 
 Todos are stored in $TODO_FILE (default: ~/.todo.txt).";
 
+// Turning the result into an exit code holds no rule for Flux to check.
+// Ignored code may call checked code, though not the other way round.
+#[flux_rs::ignore]
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     match run(&args) {
