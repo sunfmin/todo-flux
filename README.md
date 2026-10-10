@@ -14,7 +14,7 @@ todo done <n>        mark todo n as done
 todo undo <n>        mark todo n as open again
 todo pri <n> <1-3>   set the priority of todo n (1 is highest)
 todo mv <n> <m>      move todo n to position m
-todo rm <n>..        delete the todos numbered
+todo rm <n|n-m>..    delete the todos numbered; 2-4 means 2, 3 and 4
 todo clear           delete every done todo
 ```
 
@@ -38,22 +38,28 @@ a runtime panic or a silently wrong file.
 | Enums with refined variants, enum invariants | A parsed command fits the list it was parsed against, so running it needs no checks | `Command`, `parse` |
 | Refined arrays, const generics, refined function pointers | One counting loop serves any number of slots, and every todo lands in a slot that exists | `TodoList::tally` |
 | Refined closure signatures | The loop that hands indexes to a closure only hands out valid ones | `TodoList::each_index` |
-| `for` loops over ranges, `invariant!` | Loop variables stay in range; one invariant is written by hand | `TodoList::progress` |
+| `for` loops over ranges | Loop variables stay in range, with nothing written by hand | `TodoList::progress` |
+| `invariant!` | Counting the digits of the largest todo number cannot overflow | `number_width` |
 | `qualifier!` | Removal shrinks the list by exactly the todos it returns: none lost, none taken twice | `TodoList::remove_all` |
+| Scraped qualifiers (`scrape_quals`) | A range like `2-4` names every number between its ends and exactly that many | `span` |
 | Refined slices and iterators | Walking the todos with `enumerate` yields indexes that are in the list | `TodoList::todos`, `next` |
 | Associated refinements of a std trait | `list[i]` is in bounds | `impl Index for TodoList` |
 | A trait of our own with a defaulted associated refinement | A selection by number must fit the list; one by status fits any list | `Selection` |
+| Refined associated types | What a selection holds is said over the thing it chooses by, a number or a status, and each implementation is checked against it | `Selection::By` |
 | Sets | Which numbers were picked: none can be picked twice | `Picks` |
 | Bitvectors, bitvector constants | A set of statuses never holds a bit that is not a status, and behaves like a set | `StatusSet`, `STATUS_BITS` |
+| Properties for primitive operators | A status's bit is `1 << slot`, so the bits follow the slots | `OneShiftedToASlot`, `Status::bit` |
+| Uninterpreted operators (`uif_ops`) | The percent bound rests on what `*` and `/` compute: forget that and it is unprovable | `src/rejected.rs` |
 | `char` literals, sort casts | The priority in a line is one digit, and it is read as the number it stands for | `priority_digit` |
 | String literals in refinements | Each status has its own mark, so a mark in the file says which status it is | `mark_of`, `Status::mark` |
 | Uninterpreted functions | A text makes a title exactly when it is not blank, whatever "blank" computes | `blank`, `Title::new` |
 | Hidden and revealed definitions | Other proofs rely on the status rule holding, not on what it says | `can_become` |
 | `forall` preconditions, bounded quantifiers | Theorems: no status is a dead end; no priority slot is spare | `status_theorems` |
 | Generic (abstract) refinements | The smaller of two priorities is a priority, said once for every type | `cmp_specs` |
-| Extern specs: methods, a free function, a primitive type | What `Vec::remove`, `Vec::insert`, `std::cmp::min` and `char::to_digit` promise | `vec_specs`, `cmp_specs`, `char_specs` |
+| Extern specs: a struct and its methods, a free function, a primitive type | What `BTreeSet`, `std::cmp::min` and `char::to_digit` promise | `set_specs`, `cmp_specs`, `char_specs` |
+| A refined vector (`RVec`) | Reading a todo at a proved index cannot panic | `src/rvec.rs` |
 | Detached specs, `trusted_derive` | `==` on statuses is true exactly for equal statuses | `Status` |
-| Opaque structs, trusted functions | A title is never blank | `Title`, `Picks` |
+| Opaque structs, trusted functions | A title is never blank | `Title`, `RVec` |
 | Type holes (`_`) | A spec names only the part it is about | `split_priority`, `parse` |
 | Refined `impl Trait` and `dyn Trait` | Every priority an iterator yields is a priority; output goes to any writer | `priorities`, `run` |
 | `ignore` | The one function with no rule to check is left out | `main` |
@@ -66,33 +72,23 @@ a runtime panic or a silently wrong file.
 - Behavior. That `done 2` marks the second todo, that the file round-trips,
   what the messages say. `tests/cli.rs` covers those.
 - Assumptions made by hand: the extern specs for std, the trusted functions
-  of `Title` and `Picks`, and the derived `==` on `Status`. `./verify.sh`
-  prints how many functions are trusted.
+  of `Title` and `RVec`, `Picks::contains`, and the derived `==` on `Status`.
+  `./verify.sh` prints how many functions are trusted.
 - One opt-out: `tally` is not checked for overflow. Its counts cannot pass
   the list's length, but Flux cannot infer that for every array element.
-- The functions that touch the `Vec` are not marked `no_panic`: their indexes
-  are proved in bounds, but Flux does not accept the standard library's
-  indexing and allocation as panic-free.
+- The functions that add or remove todos are not marked `no_panic`: growing
+  a vector can fail to allocate.
 
-## Flux features not used
+## Coverage of the Flux guide
 
-These are in the Flux guide and have no use here:
+Every section of the [specifications guide](https://flux-rs.github.io/flux/guide/specifications.html)
+has a use above. Two notes:
 
-- Properties for primitive operators (`property ... [<<]`). They add facts
-  about `<<`, `&` and the like on integers. The one place this program works
-  with bits uses bitvectors, which Flux reasons about exactly.
-- Uninterpreted operators (`uif_ops`). They make the solver forget what `*`
-  or `/` compute, to help it when it gets stuck. It never did, and `percent`
-  needs the real arithmetic.
-- Scraped qualifiers (`scrape_quals`). An automatic way to find loop
-  invariants; the two loops that need one say theirs with `invariant!` and
-  `qualifier!`.
-- Refined associated types. No trait here has an associated type.
-- `RVec` and the other containers in Flux's own test library. `Vec` and
-  slices from std, with the specs in `flux-alloc` and `flux-core`, do the job.
-
-To check one function instead of the crate, use Flux's include patterns:
-`./verify.sh check --only-check='def:list::TodoList::remove_all'`.
+- Extern specs for traits are used, not written: `list[i]` and the
+  `enumerate` loop rely on the ones `flux-core` ships for `Index` and
+  `Iterator`.
+- Include patterns are a command-line feature. To check one function instead
+  of the crate: `./verify.sh check --only-check='def:list::TodoList::remove_all'`.
 
 ## Build, test, verify
 
