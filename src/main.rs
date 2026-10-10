@@ -208,10 +208,11 @@ fn print_list(out: &mut dyn Write, list: &TodoList, only: Option<Status>) -> io:
     let progress = list.progress();
     writeln!(
         out,
-        "{}/{total} done ({}%), {} left",
+        "{}/{total} done ({}%), {} left, {} doing",
         progress.done,
         progress.percent(),
-        progress.left()
+        progress.left(),
+        list.by_status()[Status::Doing.slot()]
     )?;
     let open = list.open_by_priority();
     for priority in priorities() {

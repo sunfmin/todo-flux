@@ -53,12 +53,12 @@ fn add_done_undo_rm_round_trip() {
     cli.ok(&["add", "write report"]);
     assert_eq!(
         cli.ok(&["list"]),
-        " 1. [ ] !2 buy milk\n 2. [ ] !2 write report\n0/2 done (0%), 2 left\n  0 open at !1\n  2 open at !2\n  0 open at !3\n"
+        " 1. [ ] !2 buy milk\n 2. [ ] !2 write report\n0/2 done (0%), 2 left, 0 doing\n  0 open at !1\n  2 open at !2\n  0 open at !3\n"
     );
 
     assert_eq!(
         cli.ok(&["done", "2"]),
-        " 1. [ ] !2 buy milk\n 2. [x] !2 write report\n1/2 done (50%), 1 left\n  0 open at !1\n  1 open at !2\n  0 open at !3\n"
+        " 1. [ ] !2 buy milk\n 2. [x] !2 write report\n1/2 done (50%), 1 left, 0 doing\n  0 open at !1\n  1 open at !2\n  0 open at !3\n"
     );
     assert_eq!(cli.stored(), "[ ] !2 buy milk\n[x] !2 write report\n");
 
@@ -67,7 +67,7 @@ fn add_done_undo_rm_round_trip() {
 
     assert_eq!(
         cli.ok(&["rm", "1"]),
-        "removed: buy milk\n 1. [ ] !2 write report\n0/1 done (0%), 1 left\n  0 open at !1\n  1 open at !2\n  0 open at !3\n"
+        "removed: buy milk\n 1. [ ] !2 write report\n0/1 done (0%), 1 left, 0 doing\n  0 open at !1\n  1 open at !2\n  0 open at !3\n"
     );
     assert_eq!(cli.stored(), "[ ] !2 write report\n");
 
@@ -105,7 +105,7 @@ fn status_follows_the_rules() {
     cli.ok(&["start", "1"]);
     assert!(
         cli.ok(&["list"])
-            .starts_with(" 1. [~] !2 a\n0/1 done (0%), 1 left\n")
+            .starts_with(" 1. [~] !2 a\n0/1 done (0%), 1 left, 1 doing\n")
     );
 }
 
@@ -118,7 +118,8 @@ fn list_can_show_one_status_under_the_original_numbers() {
     cli.ok(&["start", "2"]);
     cli.ok(&["done", "3"]);
 
-    let summary = "1/3 done (33%), 2 left\n  0 open at !1\n  2 open at !2\n  0 open at !3\n";
+    let summary =
+        "1/3 done (33%), 2 left, 1 doing\n  0 open at !1\n  2 open at !2\n  0 open at !3\n";
     assert_eq!(
         cli.ok(&["list", "open"]),
         format!(" 1. [ ] !2 a\n{summary}")

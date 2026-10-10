@@ -50,8 +50,21 @@ pub enum Status {
 }]
 const _: () = ();
 
+pub const STATUSES: usize = 3;
+
 impl Status {
-    const ALL: [Status; 3] = [Status::Open, Status::Doing, Status::Done];
+    const ALL: [Status; STATUSES] = [Status::Open, Status::Doing, Status::Done];
+
+    /// Where this status sits in `ALL` and in `TodoList::by_status`.
+    #[no_panic]
+    #[spec(fn(&Status) -> usize{slot: slot < STATUSES})]
+    pub fn slot(&self) -> usize {
+        match self {
+            Status::Open => 0,
+            Status::Doing => 1,
+            Status::Done => 2,
+        }
+    }
 
     /// Whether a todo in this status may move to `to`. This is the one
     /// function that sees inside the rule, to be checked against it.
@@ -434,19 +447,41 @@ impl TodoList {
         Progress { done, total }
     }
 
-    /// How many open todos there are at each priority, highest first. A
-    /// priority always has a slot: its range is the array's length.
+    /// How many open todos there are at each priority, highest first.
+    pub fn open_by_priority(&self) -> [usize; PRIORITY_LEVELS] {
+        self.tally(|index| {
+            let todo = &self[index];
+            if todo.status.is_done() {
+                None
+            } else {
+                Some(slot(todo.priority))
+            }
+        })
+    }
+
+    /// How many todos there are in each status, in the order of `Status::ALL`.
+    pub fn by_status(&self) -> [usize; STATUSES] {
+        self.tally(|index| Some(self[index].status.slot()))
+    }
+
+    /// Counts todos into `N` slots: `slot_at` says which slot the todo at an
+    /// index goes to, or `None` to leave it out. It works for any number of
+    /// slots because the slot's type is tied to the array's length.
     // No count can pass the list's length, but that needs a fact about every
     // element of the array on every turn of the loop, which Flux cannot infer.
     #[opts(check_overflow = "none")]
-    pub fn open_by_priority(&self) -> [usize; PRIORITY_LEVELS] {
-        let mut counts = [0; PRIORITY_LEVELS];
-        self.each_index(|index| {
-            let todo = &self[index];
-            if !todo.status.is_done() {
-                counts[slot(todo.priority)] += 1;
+    #[spec(fn(&TodoList[@n], slot_at: F) -> [usize; N]
+           where F: FnMut(usize{i: i < n}) -> Option<usize{slot: slot < N}>)]
+    fn tally<const N: usize, F>(&self, mut slot_at: F) -> [usize; N]
+    where
+        F: FnMut(usize) -> Option<usize>,
+    {
+        let mut counts = [0; N];
+        for i in 0..self.len() {
+            if let Some(slot) = slot_at(i) {
+                counts[slot] += 1;
             }
-        });
+        }
         counts
     }
 
