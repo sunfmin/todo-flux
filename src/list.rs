@@ -20,6 +20,9 @@ defs! {
     fn is_priority(p: int) -> bool { HIGHEST_PRIORITY <= p && p <= LOWEST_PRIORITY }
     fn is_position(pos: int, len: int) -> bool { 1 <= pos && pos <= len }
     // A finished todo must be reopened before it can be worked on again.
+    // Hidden: other code may rely on the rule holding, not on what it says,
+    // so the rule can change without any other proof having to.
+    #[hide]
     fn can_become(from: Status, to: Status) -> bool { !(from == Status::Done && to == Status::Doing) }
 }
 
@@ -35,7 +38,9 @@ pub enum Status {
 impl Status {
     const ALL: [Status; 3] = [Status::Open, Status::Doing, Status::Done];
 
-    /// Whether a todo in this status may move to `to`.
+    /// Whether a todo in this status may move to `to`. This is the one
+    /// function that sees inside the rule, to be checked against it.
+    #[reveal(can_become)]
     #[spec(fn(&Status[@from], to: Status) -> bool[can_become(from, to)])]
     #[no_panic]
     pub fn can_become(&self, to: Status) -> bool {
