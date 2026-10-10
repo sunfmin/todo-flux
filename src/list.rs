@@ -165,6 +165,15 @@ impl Title {
     }
 }
 
+/// The smaller of two numbers. It is generic in what is known about them:
+/// whatever property `p` both have, the result has too, so the smaller of
+/// two priorities is a priority and nothing here mentions priorities.
+#[no_panic]
+#[spec(fn[hrn p: int -> bool](a: u8{p(a)}, b: u8{p(b)}) -> u8{v: p(v) && v <= a && v <= b})]
+fn smaller(a: u8, b: u8) -> u8 {
+    if a < b { a } else { b }
+}
+
 /// Every priority, most urgent first. Whatever the iterator is made of, each
 /// item it yields is a proved priority.
 #[spec(fn() -> impl Iterator<Item = Priority>)]
@@ -462,6 +471,39 @@ impl TodoList {
             }
         }
         Progress { done, total }
+    }
+
+    /// Inverse of `locate`: the number a user sees for an index.
+    #[spec(fn(&TodoList[@n], index: usize{index < n}) -> usize[index + 1])]
+    pub fn position(&self, index: usize) -> usize {
+        // The length is a usize, so it is what tells Flux that an index
+        // below it can be increased without overflow.
+        let _fits_in_usize = self.len();
+        index + 1
+    }
+
+    /// The todo to work on next: the first one not done among those of the
+    /// most urgent priority that has any, or `None` when everything is done.
+    #[spec(fn(&TodoList[@n]) -> Option<usize{i: i < n}>)]
+    pub fn next(&self) -> Option<usize> {
+        let mut most_urgent: Option<Priority> = None;
+        for i in 0..self.len() {
+            let todo = &self[i];
+            if !todo.status.is_done() {
+                most_urgent = Some(match most_urgent {
+                    Some(priority) => smaller(priority, todo.priority),
+                    None => todo.priority,
+                });
+            }
+        }
+        let wanted = most_urgent?;
+        for i in 0..self.len() {
+            let todo = &self[i];
+            if !todo.status.is_done() && todo.priority == wanted {
+                return Some(i);
+            }
+        }
+        None
     }
 
     /// How many open todos there are at each priority, highest first.
