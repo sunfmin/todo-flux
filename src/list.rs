@@ -326,12 +326,14 @@ pub fn slot(priority: Priority) -> usize {
     (priority - HIGHEST_PRIORITY) as usize
 }
 
-#[refined_by(status: Status)]
+/// One todo. Its status and its priority are both in its type, so a
+/// function that changes one can say it leaves the other as it was.
+#[refined_by(status: Status, priority: int)]
 pub struct Todo {
     pub title: Title,
     #[field(Status[status])]
     pub status: Status,
-    #[field(Priority)]
+    #[field({u8[priority] | is_priority(priority)})]
     pub priority: Priority,
 }
 
@@ -385,9 +387,10 @@ impl Todo {
 
     /// Moves the todo to another status if the rules allow it, and says
     /// whether it did. Flux checks this against the rules: it moves exactly
-    /// when `can_become` holds and otherwise leaves the status alone.
+    /// when `can_become` holds and otherwise leaves the status alone. Either
+    /// way the rest of the todo, its priority, is what it was.
     #[spec(fn(self: &mut Todo[@t], to: Status) -> bool[can_become(t.status, to)]
-           ensures self: Todo{v: v.status == if can_become(t.status, to) { to } else { t.status }})]
+           ensures self: Todo[Todo { status: if can_become(t.status, to) { to } else { t.status }, ..t }])]
     #[no_panic]
     pub fn try_become(&mut self, to: Status) -> bool {
         let allowed = self.status.can_become(to);
@@ -395,6 +398,13 @@ impl Todo {
             self.status = to;
         }
         allowed
+    }
+
+    /// Changes the priority and nothing else: the status is what it was.
+    #[spec(fn(self: &mut Todo[@t], Priority[@priority]) ensures self: Todo[Todo { priority: priority, ..t }])]
+    #[no_panic]
+    pub fn set_priority(&mut self, priority: Priority) {
+        self.priority = priority;
     }
 }
 
@@ -597,7 +607,7 @@ impl TodoList {
 
     #[spec(fn(&mut TodoList[@n], usize{i: i < n}, Priority))]
     pub fn set_priority(&mut self, index: usize, priority: Priority) {
-        self.items[index].priority = priority;
+        self.items[index].set_priority(priority);
     }
 
     /// Moves a todo to another position. The list keeps its length: nothing
