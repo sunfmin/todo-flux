@@ -261,6 +261,39 @@ fn numbers_line_up_in_a_long_list() {
 }
 
 #[test]
+fn rm_takes_ranges() {
+    let cli = Cli::new("rm-range");
+    for title in ["a", "b", "c", "d", "e", "f"] {
+        cli.ok(&["add", title]);
+    }
+    assert!(cli.ok(&["rm", "2-4", "6"]).starts_with(
+        "removed: b\nremoved: c\nremoved: d\nremoved: f\n 1. [ ] !2 a\n 2. [ ] !2 e\n"
+    ));
+    assert!(cli.ok(&["rm", "2-2"]).starts_with("removed: e\n"));
+    assert_eq!(cli.stored(), "[ ] !2 a\n");
+
+    for title in ["b", "c"] {
+        cli.ok(&["add", title]);
+    }
+    for args in [
+        ["rm", "3-1", "1"],
+        ["rm", "1-4", "1"],
+        ["rm", "0-2", "1"],
+        ["rm", "1-", "1"],
+        ["rm", "-2", "1"],
+        ["rm", "1-2-3", "1"],
+    ] {
+        assert!(!cli.run(&args).status.success(), "{args:?}");
+    }
+    let out = cli.run(&["rm", "1-2", "2-3"]);
+    assert_eq!(
+        String::from_utf8_lossy(&out.stderr),
+        "todo: todo 2 is named twice\n"
+    );
+    assert_eq!(cli.stored(), "[ ] !2 a\n[ ] !2 b\n[ ] !2 c\n");
+}
+
+#[test]
 fn out_of_range_positions_are_rejected_without_changing_the_file() {
     let cli = Cli::new("out-of-range");
     cli.ok(&["add", "only one"]);
