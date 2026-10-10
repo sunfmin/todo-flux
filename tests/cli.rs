@@ -1,7 +1,7 @@
 use std::{
     env, fs,
     path::PathBuf,
-    process::{Command, Output},
+    process::{Command, Output, Stdio},
 };
 
 struct Cli {
@@ -236,4 +236,28 @@ fn title_that_looks_like_a_priority_survives_a_round_trip() {
     cli.ok(&["add", "!1 not a priority"]);
     cli.ok(&["done", "1"]);
     assert_eq!(cli.stored(), "[x] !2 !1 not a priority\n");
+}
+
+#[test]
+fn reader_that_stops_early_is_not_an_error() {
+    let cli = Cli::new("closed-pipe");
+    // More than a pipe holds, so the write cannot finish before the reader goes.
+    fs::write(&cli.file, "[ ] !2 some todo\n".repeat(20_000)).unwrap();
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_todo"))
+        .arg("list")
+        .env("TODO_FILE", &cli.file)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    drop(child.stdout.take());
+    let out = child.wait_with_output().unwrap();
+
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(out.stderr.is_empty());
 }
