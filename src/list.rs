@@ -19,6 +19,11 @@ pub const PRIORITY_LEVELS: usize = (LOWEST_PRIORITY - HIGHEST_PRIORITY + 1) as u
 defs! {
     fn is_priority(p: int) -> bool { HIGHEST_PRIORITY <= p && p <= LOWEST_PRIORITY }
     fn is_position(pos: int, len: int) -> bool { 1 <= pos && pos <= len }
+    // The shortest list that is `need` long and also has `index` in it.
+    fn need_with(need: int, index: int) -> int {
+        let past = index + 1;
+        if past > need { past } else { need }
+    }
     // How each status starts a line of the text format.
     fn mark_of(status: Status) -> str {
         if status == Status::Open { "[ ] " } else if status == Status::Doing { "[~] " } else { "[x] " }
@@ -487,7 +492,7 @@ impl Picks {
     /// Adds an index, and says whether it was new.
     #[trusted]
     #[spec(fn(self: &mut Picks[@p], usize[@index]) -> bool[!set_is_in(index, p.picked)]
-           ensures self: Picks[set_union(set_singleton(index), p.picked), if index < p.need { p.need } else { index + 1 }])]
+           ensures self: Picks[set_union(set_singleton(index), p.picked), need_with(p.need, index)])]
     pub fn pick(&mut self, index: usize) -> bool {
         self.0.insert(index)
     }
