@@ -20,14 +20,15 @@ use std::{
 
 use flux_rs::{attrs::*, defs, macros::invariant};
 use list::{
-    HIGHEST_PRIORITY, LOWEST_PRIORITY, Picks, Priority, Removed, Status, StatusSet, Title,
-    TodoList, priorities, priority, slot,
+    Choice, HIGHEST_PRIORITY, InProgress, LOWEST_PRIORITY, MostUrgent, Picks, Priority, Removed,
+    Status, StatusSet, Title, TodoList, priorities, priority, slot,
 };
 
 const USAGE: &str = "\
 usage: todo [list]          show all todos
        todo list <status>.. show only open, doing or done todos
        todo next            show the most urgent todo that is not done
+       todo now             show the todo being worked on
        todo add <title>     add a todo
        todo start <n>       mark todo n as being worked on
        todo done <n>        mark todo n as done
@@ -69,8 +70,8 @@ enum Command {
     List(StatusSet),
     #[variant(Command[0])]
     Help,
-    #[variant(Command[0])]
-    Next,
+    #[variant((_) -> Command[0])]
+    Show(&'static dyn Choice),
     #[variant((_) -> Command[0])]
     Add(Title),
     #[variant((usize[@index], Status) -> Command[index + 1])]
@@ -107,8 +108,8 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
         Command::Help => {
             return written(writeln!(out, "{USAGE}"));
         }
-        Command::Next => {
-            return written(match list.next() {
+        Command::Show(choice) => {
+            return written(match choice.of(&list) {
                 Some(index) => writeln!(
                     out,
                     "{:>width$}. {}",
@@ -116,7 +117,7 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
                     list[index].line(),
                     width = number_width(list.len())
                 ),
-                None => writeln!(out, "nothing to do"),
+                None => writeln!(out, "{}", choice.none()),
             });
         }
         Command::Add(title) => list.add(title),
@@ -166,7 +167,8 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
         }
         ("clear", []) => Ok(Command::Clear),
         ("help" | "-h" | "--help", _) => Ok(Command::Help),
-        ("next", []) => Ok(Command::Next),
+        ("next", []) => Ok(Command::Show(&MostUrgent)),
+        ("now", []) => Ok(Command::Show(&InProgress)),
         ("add", words) => match Title::new(&words.join(" ")) {
             Some(title) => Ok(Command::Add(title)),
             None => Err("add needs a title".to_string()),

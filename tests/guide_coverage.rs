@@ -210,7 +210,7 @@ const USES: &[(&str, &str, &str)] = &[
     (
         "Dynamic Trait Objects",
         "src/main.rs",
-        "out: &mut dyn Write",
+        "Show(&'static dyn Choice)",
     ),
     (
         "Generic Refinements",

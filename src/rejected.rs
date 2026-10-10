@@ -237,3 +237,14 @@ fn a_new_todo_claimed_to_start_done() -> Status {
 fn every_default_claimed_impossible<T: Default>() -> T {
     T::default()
 }
+
+#[should_fail]
+fn todo_chosen_from_one_list_read_from_another(
+    choice: &dyn crate::list::Choice,
+    list: &TodoList,
+    other: &TodoList,
+) {
+    if let Some(index) = choice.of(list) {
+        let _ = &other[index];
+    }
+}

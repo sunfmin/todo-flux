@@ -877,6 +877,17 @@ impl TodoList {
         None
     }
 
+    /// The first todo being worked on, or `None` when none is.
+    #[spec(fn(&TodoList[@n]) -> Option<usize{i: i < n}>)]
+    fn first_doing(&self) -> Option<usize> {
+        for (i, todo) in self.todos().iter().enumerate() {
+            if todo.status == Status::Doing {
+                return Some(i);
+            }
+        }
+        None
+    }
+
     /// How many open todos there are at each priority, highest first.
     pub fn open_by_priority(&self) -> [usize; PRIORITY_LEVELS] {
         self.tally(Todo::open_priority_slot)
@@ -932,6 +943,46 @@ impl TodoList {
     #[spec(fn(self: &mut TodoList[@n], Todo) ensures self: TodoList[n + 1])]
     fn push(&mut self, todo: Todo) {
         self.items.push(todo);
+    }
+}
+
+/// A way to single one todo out of a list. The caller holds it as a trait
+/// object and so cannot know which way it is: the spec on the trait method is
+/// all Flux has to go on at the call, and it is enough to index the list
+/// with the answer. Every implementation is checked against that spec.
+pub trait Choice {
+    #[spec(fn(&Self, &TodoList[@n]) -> Option<usize{i: i < n}>)]
+    fn of(&self, list: &TodoList) -> Option<usize>;
+
+    /// What to tell the user when no todo is chosen.
+    fn none(&self) -> &'static str;
+}
+
+/// The todo `TodoList::next` names.
+pub struct MostUrgent;
+
+impl Choice for MostUrgent {
+    #[spec(fn(&Self, &TodoList[@n]) -> Option<usize{i: i < n}>)]
+    fn of(&self, list: &TodoList) -> Option<usize> {
+        list.next()
+    }
+
+    fn none(&self) -> &'static str {
+        "nothing to do"
+    }
+}
+
+/// The first todo being worked on.
+pub struct InProgress;
+
+impl Choice for InProgress {
+    #[spec(fn(&Self, &TodoList[@n]) -> Option<usize{i: i < n}>)]
+    fn of(&self, list: &TodoList) -> Option<usize> {
+        list.first_doing()
+    }
+
+    fn none(&self) -> &'static str {
+        "nothing in progress"
     }
 }
 

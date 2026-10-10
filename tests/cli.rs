@@ -141,6 +141,23 @@ fn list_can_show_one_status_under_the_original_numbers() {
 }
 
 #[test]
+fn now_is_the_first_todo_being_worked_on() {
+    let cli = Cli::new("now");
+    assert_eq!(cli.ok(&["now"]), "nothing in progress\n");
+    for title in ["a", "b", "c"] {
+        cli.ok(&["add", title]);
+    }
+    assert_eq!(cli.ok(&["now"]), "nothing in progress\n");
+
+    cli.ok(&["start", "3"]);
+    cli.ok(&["start", "2"]);
+    assert_eq!(cli.ok(&["now"]), " 2. [~] !2 b\n");
+
+    cli.ok(&["done", "2"]);
+    assert_eq!(cli.ok(&["now"]), " 3. [~] !2 c\n");
+}
+
+#[test]
 fn next_is_the_first_open_todo_of_the_most_urgent_priority() {
     let cli = Cli::new("next");
     assert_eq!(cli.ok(&["next"]), "nothing to do\n");

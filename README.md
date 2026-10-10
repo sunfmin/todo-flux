@@ -8,6 +8,7 @@ program on purpose: each part of it shows one thing Flux can do.
 todo [list]          show all todos
 todo list <status>.. show only open, doing or done todos
 todo next            show the most urgent todo that is not done
+todo now             show the todo being worked on
 todo add <title>     add a todo
 todo start <n>       mark todo n as being worked on
 todo done <n>        mark todo n as done
@@ -62,7 +63,8 @@ a runtime panic or a silently wrong file.
 | Detached specs, `trusted_derive` | `==` on statuses is true exactly for equal statuses | `Status` |
 | Opaque structs, trusted functions | A title is never blank | `Title`, `RVec` |
 | Type holes (`_`) in signatures, fields, variants and aliases | A spec names only the part it is about | `split_priority`, `parse`, `Picks`, `Command`, `Removed` |
-| Refined `impl Trait` and `dyn Trait` | Every priority an iterator yields is a priority; output goes to any writer | `priorities`, `run` |
+| Refined `impl Trait` | Every priority an iterator yields is a priority | `priorities` |
+| Refined `dyn Trait` | `next` and `now` choose a todo through a trait object, and the index that comes back is proved to be in the list | `Choice` |
 | `ignore` | The one function with no rule to check is left out | `main` |
 | Overflow checking (`strict`, whole crate; `opts` for one function) | No arithmetic overflows or underflows, no division by zero | `Cargo.toml` |
 | `no_panic` | The rule functions cannot panic on any input | `src/list.rs` |
