@@ -70,6 +70,31 @@ fn add_done_undo_rm_round_trip() {
         "removed: buy milk\n 1. [ ] write report\n"
     );
     assert_eq!(cli.stored(), "[ ] write report\n");
+
+    assert_eq!(
+        cli.ok(&["rm", "1"]),
+        "removed: write report\nnothing to do\n"
+    );
+    assert_eq!(cli.stored(), "");
+}
+
+#[test]
+fn mv_reorders_without_losing_todos() {
+    let cli = Cli::new("mv");
+    for title in ["a", "b", "c"] {
+        cli.ok(&["add", title]);
+    }
+    cli.ok(&["mv", "1", "3"]);
+    assert_eq!(cli.stored(), "[ ] b\n[ ] c\n[ ] a\n");
+    cli.ok(&["mv", "3", "1"]);
+    assert_eq!(cli.stored(), "[ ] a\n[ ] b\n[ ] c\n");
+    cli.ok(&["mv", "2", "2"]);
+    assert_eq!(cli.stored(), "[ ] a\n[ ] b\n[ ] c\n");
+
+    for args in [["mv", "0", "1"], ["mv", "1", "4"], ["mv", "4", "1"]] {
+        assert!(!cli.run(&args).status.success(), "{args:?}");
+    }
+    assert_eq!(cli.stored(), "[ ] a\n[ ] b\n[ ] c\n");
 }
 
 #[test]
@@ -97,6 +122,9 @@ fn bad_commands_fail() {
     assert!(!cli.run(&["add"]).status.success());
     assert!(!cli.run(&["add", "  "]).status.success());
     assert!(!cli.run(&["frobnicate"]).status.success());
+    assert!(!cli.run(&["done"]).status.success());
+    assert!(!cli.run(&["done", "1", "2"]).status.success());
+    assert!(!cli.run(&["mv", "1"]).status.success());
     assert!(!cli.file.exists());
 }
 
@@ -104,7 +132,8 @@ fn bad_commands_fail() {
 fn hand_edited_file_loads() {
     let cli = Cli::new("hand-edited");
     fs::write(&cli.file, "no mark\n\n[x] finished\n").unwrap();
-    assert_eq!(cli.ok(&["list"]), " 1. [ ] no mark\n 2. [x] finished\n");
+    cli.ok(&["mv", "1", "1"]);
+    assert_eq!(cli.stored(), "[ ] no mark\n[x] finished\n");
 }
 
 #[test]

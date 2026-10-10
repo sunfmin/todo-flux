@@ -8,7 +8,6 @@ use flux_rs::attrs::*;
 
 const DONE_MARK: &str = "[x] ";
 const OPEN_MARK: &str = "[ ] ";
-
 pub struct Todo {
     pub title: String,
     pub done: bool,
@@ -24,22 +23,18 @@ impl Todo {
     /// Inverse of `line`. A line without a mark is an open todo, so any
     /// hand-edited file still loads.
     fn from_line(line: &str) -> Todo {
-        if let Some(title) = line.strip_prefix(DONE_MARK) {
-            Todo {
-                title: title.to_string(),
-                done: true,
-            }
-        } else {
-            let title = line.strip_prefix(OPEN_MARK).unwrap_or(line);
-            Todo {
-                title: title.to_string(),
-                done: false,
-            }
+        let (done, title) = match line.strip_prefix(DONE_MARK) {
+            Some(title) => (true, title),
+            None => (false, line.strip_prefix(OPEN_MARK).unwrap_or(line)),
+        };
+        Todo {
+            title: title.to_string(),
+            done,
         }
     }
 }
 
-/// `flux-alloc` has no spec for `Vec::remove` yet. Only Flux reads this, so
+/// `flux-alloc` has no specs for `Vec::remove` and `Vec::insert` yet. Only Flux reads this, so
 /// the unstable `Allocator` it must name never reaches a normal build.
 #[cfg(flux)]
 mod vec_specs {
@@ -51,6 +46,9 @@ mod vec_specs {
     impl<T, A: Allocator> Vec<T, A> {
         #[spec(fn(self: &mut Vec<T, A>[@n], usize{i: i < n}) -> T ensures self: Vec<T, A>[n - 1])]
         fn remove(&mut self, index: usize) -> T;
+
+        #[spec(fn(self: &mut Vec<T, A>[@n], usize{i: i <= n}, T) ensures self: Vec<T, A>[n + 1])]
+        fn insert(&mut self, index: usize, element: T);
     }
 }
 
@@ -121,6 +119,14 @@ impl TodoList {
     #[spec(fn(&mut TodoList[@n], usize{i: i < n}, done: bool))]
     pub fn set_done(&mut self, index: usize, done: bool) {
         self.items[index].done = done;
+    }
+
+    /// Moves a todo to another position. The list keeps its length: nothing
+    /// is lost or duplicated on the way.
+    #[spec(fn(self: &mut TodoList[@n], from: usize{from < n}, to: usize{to < n}) ensures self: TodoList[n])]
+    pub fn move_to(&mut self, from: usize, to: usize) {
+        let todo = self.items.remove(from);
+        self.items.insert(to, todo);
     }
 
     #[spec(fn(self: &mut TodoList[@n], usize{i: i < n}) -> Todo ensures self: TodoList[n - 1])]

@@ -4,11 +4,12 @@ A command-line todo list in Rust whose index safety is proved at compile time
 by [Flux](https://flux-rs.github.io/flux) (liquid types for Rust).
 
 ```
-todo [list]        show all todos
-todo add <title>   add a todo
-todo done <n>      mark todo n as done
-todo undo <n>      mark todo n as not done
-todo rm <n>        delete todo n
+todo [list]          show all todos
+todo add <title>     add a todo
+todo done <n>        mark todo n as done
+todo undo <n>        mark todo n as not done
+todo mv <n> <m>      move todo n to position m
+todo rm <n>          delete todo n
 ```
 
 Todos live in `$TODO_FILE` (default `~/.todo.txt`), one per line as
@@ -16,11 +17,18 @@ Todos live in `$TODO_FILE` (default `~/.todo.txt`), one per line as
 
 ## What Flux proves
 
-`TodoList` carries its length in its type (`src/list.rs`). `get`, `set_done`
-and `remove` only accept an index Flux can prove is below that length, and
-`locate` is the one function that turns a number typed by the user into such
-an index. Passing an unchecked number, or an off-by-one in `locate`, is a
-compile error under Flux rather than a runtime panic.
+Each of these is a compile error under Flux when the code gets it wrong,
+instead of a runtime panic or a silently wrong file.
+
+| Property | Where | What a bug would look like |
+|---|---|---|
+| Indexes are in bounds | `TodoList` carries its length in its type; `get`, `set_done`, `remove` only accept an index below it, and `locate` is the one function that makes such an index from user input | passing an unchecked number, an off-by-one in `locate` |
+| Moving keeps every todo | `move_to` must give back a list of the same length | removing the todo and forgetting to put it back |
+
+Flux does not prove behavior: that `done 2` marks the second todo, that the
+file round-trips, or what the error messages say. `tests/cli.rs` covers those.
+The specs for `Vec::remove` and `Vec::insert` in `src/list.rs` are assumed,
+not proved.
 
 ## Build, test, verify
 
