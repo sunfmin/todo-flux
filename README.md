@@ -23,6 +23,7 @@ instead of a runtime panic or a silently wrong file.
 | Property | Where | What a bug would look like |
 |---|---|---|
 | Indexes are in bounds | `TodoList` carries its length in its type; `get`, `set_done`, `remove` only accept an index below it, and `locate` is the one function that makes such an index from user input | passing an unchecked number, an off-by-one in `locate` |
+| No division by zero, no underflow | `percent` requires a non-empty total and a part no larger than it; `done_count` is proved to be at most the length | printing the progress line for an empty list, `done - total` |
 | Moving keeps every todo | `move_to` must give back a list of the same length | removing the todo and forgetting to put it back |
 
 Flux does not prove behavior: that `done 2` marks the second todo, that the

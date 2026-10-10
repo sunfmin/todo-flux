@@ -53,12 +53,12 @@ fn add_done_undo_rm_round_trip() {
     cli.ok(&["add", "write report"]);
     assert_eq!(
         cli.ok(&["list"]),
-        " 1. [ ] buy milk\n 2. [ ] write report\n"
+        " 1. [ ] buy milk\n 2. [ ] write report\n0/2 done (0%), 2 left\n"
     );
 
     assert_eq!(
         cli.ok(&["done", "2"]),
-        " 1. [ ] buy milk\n 2. [x] write report\n"
+        " 1. [ ] buy milk\n 2. [x] write report\n1/2 done (50%), 1 left\n"
     );
     assert_eq!(cli.stored(), "[ ] buy milk\n[x] write report\n");
 
@@ -67,7 +67,7 @@ fn add_done_undo_rm_round_trip() {
 
     assert_eq!(
         cli.ok(&["rm", "1"]),
-        "removed: buy milk\n 1. [ ] write report\n"
+        "removed: buy milk\n 1. [ ] write report\n0/1 done (0%), 1 left\n"
     );
     assert_eq!(cli.stored(), "[ ] write report\n");
 

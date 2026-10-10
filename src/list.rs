@@ -4,7 +4,7 @@
 //! `get`, `set_done` or `remove` is proved in bounds at compile time. The
 //! only way to obtain such an index from untrusted input is `locate`.
 
-use flux_rs::attrs::*;
+use flux_rs::{attrs::*, macros::invariant};
 
 const DONE_MARK: &str = "[x] ";
 const OPEN_MARK: &str = "[ ] ";
@@ -127,6 +127,22 @@ impl TodoList {
     pub fn move_to(&mut self, from: usize, to: usize) {
         let todo = self.items.remove(from);
         self.items.insert(to, todo);
+    }
+
+    /// How many todos are done, which is never more than there are.
+    #[spec(fn(&TodoList[@n]) -> usize{done: done <= n})]
+    pub fn done_count(&self) -> usize {
+        let total = self.len();
+        let mut done = 0;
+        let mut i = 0;
+        while i < total {
+            invariant!(done: int; done <= i && i <= total);
+            if self.get(i).done {
+                done += 1;
+            }
+            i += 1;
+        }
+        done
     }
 
     #[spec(fn(self: &mut TodoList[@n], usize{i: i < n}) -> Todo ensures self: TodoList[n - 1])]

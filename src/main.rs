@@ -124,4 +124,16 @@ fn print_list(list: &TodoList) {
         println!("{:>2}. {}", i + 1, list.get(i).line());
         i += 1;
     }
+    let done = list.done_count();
+    println!(
+        "{done}/{total} done ({}%), {} left",
+        percent(done, total),
+        total - done
+    );
+}
+
+/// `part` as a whole percentage of `whole`.
+#[spec(fn(part: usize, whole: usize{whole > 0 && part <= whole}) -> usize{p: p <= 100})]
+fn percent(part: usize, whole: usize) -> usize {
+    part * 100 / whole
 }
