@@ -150,3 +150,15 @@ fn sum_claimed_to_keep_any_property(a: u8, b: u8) -> u8 {
 fn a_status_found_in_a_set_it_was_never_put_in(set: StatusSet, status: Status) -> bool {
     set.contains(status)
 }
+
+#[should_fail]
+#[spec(fn(&str) -> bool[true])]
+fn any_text_claimed_to_make_a_title(text: &str) -> bool {
+    Title::new(text).is_some()
+}
+
+#[should_fail]
+#[spec(fn(&str, &str) -> bool[true])]
+fn two_texts_claimed_to_be_blank_together(a: &str, b: &str) -> bool {
+    Title::new(a).is_some() == Title::new(b).is_some()
+}

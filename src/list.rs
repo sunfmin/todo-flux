@@ -23,6 +23,10 @@ defs! {
     fn mark_of(status: Status) -> str {
         if status == Status::Open { "[ ] " } else if status == Status::Doing { "[~] " } else { "[x] " }
     }
+    // Whether nothing is left of a text once it is trimmed. It has no body:
+    // Flux cannot look inside a string, so all it knows is that this is a
+    // function, giving the same answer for the same text every time.
+    fn blank(text: str) -> bool;
     // The bit that stands for each status in a `StatusSet`, and what makes a
     // bit pattern a set of statuses: no bit outside those three.
     fn bit_of(status: Status) -> bitvec<32> {
@@ -154,9 +158,9 @@ pub struct Title(String);
 
 impl Title {
     /// Makes a title from any text, or `None` when nothing is left after
-    /// putting it on one line and trimming it.
+    /// putting it on one line and trimming it: when the text is `blank`.
     #[trusted]
-    #[spec(fn(&str) -> Option<Title>)]
+    #[spec(fn(&str[@text]) -> Option<Title>[!blank(text)])]
     pub fn new(text: &str) -> Option<Title> {
         let line = text.replace(['\n', '\r'], " ");
         let line = line.trim();
@@ -178,6 +182,22 @@ impl Title {
     #[trusted]
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+/// What Flux can prove about titles knowing only that `blank` is a function.
+/// Only Flux compiles these.
+#[cfg(flux)]
+mod title_theorems {
+    #![allow(dead_code)]
+
+    use flux_rs::attrs::*;
+
+    use super::Title;
+
+    #[spec(fn(&str) -> bool[true])]
+    fn text_that_made_a_title_makes_one_again(text: &str) -> bool {
+        Title::new(text).is_some() == Title::new(text).is_some()
     }
 }
 
