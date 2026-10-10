@@ -23,6 +23,9 @@ defs! {
     fn mark_of(status: Status) -> str {
         if status == Status::Open { "[ ] " } else if status == Status::Doing { "[~] " } else { "[x] " }
     }
+    // The number a digit character stands for. `cast` turns the character
+    // into its code so the spec can do arithmetic on it.
+    fn digit_value(c: char) -> int { cast(c) - cast('0') }
     // Whether nothing is left of a text once it is trimmed. It has no body:
     // Flux cannot look inside a string, so all it knows is that this is a
     // function, giving the same answer for the same text every time.
@@ -143,6 +146,33 @@ pub fn priority(n: u8) -> Option<Priority> {
         Some(n)
     } else {
         None
+    }
+}
+
+/// Reads the one character that stands for a priority in the text format:
+/// `Some` exactly when it is the digit of a priority, and then that number.
+#[spec(fn(char[@c]) -> Option<u8[digit_value(c)]>[is_priority(digit_value(c))])]
+fn priority_digit(c: char) -> Option<Priority> {
+    match c.to_digit(10) {
+        Some(n) => priority(n as u8),
+        None => None,
+    }
+}
+
+/// What std's `char::to_digit` does for decimal digits, said in terms of
+/// the character's code. Only Flux reads this.
+#[cfg(flux)]
+mod char_specs {
+    use flux_rs::attrs::*;
+
+    defs! {
+        use super::digit_value;
+    }
+
+    #[extern_spec]
+    impl char {
+        #[spec(fn(char[@c], u32[10]) -> Option<u32[digit_value(c)]>['0' <= c && c <= '9'])]
+        fn to_digit(self, radix: u32) -> Option<u32>;
     }
 }
 
@@ -413,9 +443,9 @@ impl Todo {
 #[spec(fn(_) -> (Priority, _))]
 fn split_priority(rest: &str) -> (Priority, &str) {
     if let Some((tag, title)) = rest.split_once(' ')
-        && let Some(digits) = tag.strip_prefix(PRIORITY_TAG)
-        && let Ok(n) = digits.parse()
-        && let Some(priority) = priority(n)
+        && let Some(digit) = tag.strip_prefix(PRIORITY_TAG)
+        && let Ok(c) = digit.parse()
+        && let Some(priority) = priority_digit(c)
     {
         return (priority, title);
     }
