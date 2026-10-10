@@ -20,8 +20,8 @@ use std::{
 
 use flux_rs::{attrs::*, defs, macros::invariant};
 use list::{
-    HIGHEST_PRIORITY, LOWEST_PRIORITY, Picks, Priority, Status, StatusSet, Title, Todo, TodoList,
-    priorities, priority, slot,
+    HIGHEST_PRIORITY, LOWEST_PRIORITY, Picks, Priority, Removed, Status, StatusSet, Title,
+    TodoList, priorities, priority, slot,
 };
 
 const USAGE: &str = "\
@@ -296,7 +296,7 @@ fn number_width(total: usize) -> usize {
     if width < 2 { 2 } else { width }
 }
 
-fn print_removed(out: &mut dyn Write, removed: Vec<Todo>) -> io::Result<()> {
+fn print_removed(out: &mut dyn Write, removed: Removed) -> io::Result<()> {
     for todo in removed {
         writeln!(out, "removed: {}", todo.title.as_str())?;
     }

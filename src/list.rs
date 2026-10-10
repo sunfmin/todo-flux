@@ -709,6 +709,11 @@ impl Progress {
     }
 }
 
+/// The todos a removal took out, in the order they had. The alias carries
+/// how many there are; the hole leaves what they are to Rust.
+#[alias(type Removed[taken: int] = Vec<_>[taken])]
+pub type Removed = Vec<Todo>;
+
 #[refined_by(len: int)]
 #[invariant(len >= 0)]
 pub struct TodoList {
@@ -894,8 +899,8 @@ impl TodoList {
     /// they had. The list shrinks by exactly as many todos as come back:
     /// none is lost and none is taken twice. Walking from the end keeps every index still to visit valid
     /// while the list shrinks under it.
-    #[spec(fn(self: &mut TodoList[@n], &S{s: <S as Selection>::need(s) <= n}) -> Vec<Todo>[#taken] ensures self: TodoList[n - taken])]
-    pub fn remove_all<S: Selection>(&mut self, chosen: &S) -> Vec<Todo> {
+    #[spec(fn(self: &mut TodoList[@n], &S{s: <S as Selection>::need(s) <= n}) -> Removed[#taken] ensures self: TodoList[n - taken])]
+    pub fn remove_all<S: Selection>(&mut self, chosen: &S) -> Removed {
         let mut removed = Vec::new();
         let mut index = self.len();
         while index > 0 {
