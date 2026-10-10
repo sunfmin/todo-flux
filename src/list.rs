@@ -307,12 +307,20 @@ mod title_theorems {
 /// A set of statuses, kept as one bit per status. Flux reasons about the
 /// bits themselves: a set never holds a bit that is not a status.
 #[derive(Clone, Copy)]
-#[refined_by(bits: bitvec<32>)]
-#[invariant(only_status_bits(bits))]
 pub struct StatusSet {
-    #[field({BV32[bits] | only_status_bits(bits)})]
     bits: BV32,
 }
+
+// What a `StatusSet` is to Flux, detached from the struct, which stays the
+// plain Rust above.
+#[specs {
+    #[refined_by(bits: bitvec<32>)]
+    #[invariant(only_status_bits(bits))]
+    struct StatusSet {
+        bits: {BV32[bits] | only_status_bits(bits)},
+    }
+}]
+const _: () = ();
 
 impl StatusSet {
     #[spec(fn() -> StatusSet[0])]
