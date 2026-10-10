@@ -20,6 +20,11 @@ pub const LOWEST_PRIORITY: u8 = 3;
 const DEFAULT_PRIORITY: Priority = 2;
 pub const PRIORITY_LEVELS: usize = (LOWEST_PRIORITY - HIGHEST_PRIORITY + 1) as usize;
 
+/// Every bit that stands for a status, and no other. The attribute gives
+/// Flux the value, which it cannot read out of a constant of this type.
+#[constant(bv_int_to_bv32(7))]
+const STATUS_BITS: BV32 = BV32::new(7);
+
 // The rules of this module, named once and used by the specs below.
 defs! {
     fn is_priority(p: int) -> bool { HIGHEST_PRIORITY <= p && p <= LOWEST_PRIORITY }
@@ -52,7 +57,7 @@ defs! {
     fn bit_of(status: Status) -> bitvec<32> {
         if status == Status::Open { 1 } else if status == Status::Doing { 2 } else { 4 }
     }
-    fn only_status_bits(bits: bitvec<32>) -> bool { bits & 7 == bits }
+    fn only_status_bits(bits: bitvec<32>) -> bool { bits & STATUS_BITS == bits }
     // A finished todo must be reopened before it can be worked on again.
     // Hidden: other code may rely on the rule holding, not on what it says,
     // so the rule can change without any other proof having to.
@@ -276,9 +281,9 @@ impl StatusSet {
         self.bits & status.bit() != 0
     }
 
-    #[spec(fn(&StatusSet[@bits]) -> bool[bits == 0])]
-    pub fn is_empty(&self) -> bool {
-        self.bits == 0
+    #[spec(fn() -> StatusSet[STATUS_BITS])]
+    pub fn all() -> StatusSet {
+        StatusSet { bits: STATUS_BITS }
     }
 }
 
@@ -295,6 +300,11 @@ mod status_set_theorems {
     #[spec(fn(Status) -> bool[false])]
     fn the_empty_set_holds_nothing(status: Status) -> bool {
         StatusSet::none().contains(status)
+    }
+
+    #[spec(fn(Status) -> bool[true])]
+    fn the_full_set_holds_every_status(status: Status) -> bool {
+        StatusSet::all().contains(status)
     }
 
     #[spec(fn(StatusSet, Status) -> bool[true])]

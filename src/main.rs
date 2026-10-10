@@ -133,7 +133,7 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
 
     fs::write(&path, list.to_text())
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
-    written(print_list(out, &list, StatusSet::none()))
+    written(print_list(out, &list, StatusSet::all()))
 }
 
 /// Reads the arguments as a command that `list` is long enough for.
@@ -144,6 +144,7 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
         None => ("list", args),
     };
     match (name, rest) {
+        ("list", []) => Ok(Command::List(StatusSet::all())),
         ("list", names) => {
             let mut only = StatusSet::none();
             for name in names {
@@ -240,8 +241,7 @@ fn print_removed(out: &mut dyn Write, removed: Vec<Todo>) -> io::Result<()> {
     Ok(())
 }
 
-/// Prints the todos, all of them or (when `only` names any) just those in
-/// the statuses named, under the numbers the other commands take, then the
+/// Prints the todos in the statuses of `only`, under the numbers the other commands take, then the
 /// summary of the whole list.
 fn print_list(out: &mut dyn Write, list: &TodoList, only: StatusSet) -> io::Result<()> {
     let total = list.len();
@@ -251,7 +251,7 @@ fn print_list(out: &mut dyn Write, list: &TodoList, only: StatusSet) -> io::Resu
     let mut result = Ok(());
     list.each_index(|index| {
         let todo = &list[index];
-        if result.is_ok() && (only.is_empty() || only.contains(todo.status)) {
+        if result.is_ok() && only.contains(todo.status) {
             result = writeln!(out, "{:>2}. {}", list.position(index), todo.line());
         }
     });
