@@ -15,6 +15,7 @@ use list::{HIGHEST_PRIORITY, LOWEST_PRIORITY, Priority, Status, TodoList, priori
 
 const USAGE: &str = "\
 usage: todo [list]          show all todos
+       todo list <status>   show only open, doing or done todos
        todo add <title>     add a todo
        todo start <n>       mark todo n as being worked on
        todo done <n>        mark todo n as done
@@ -46,7 +47,14 @@ fn run(args: &[String]) -> Result<(), String> {
 
     match (command, rest) {
         ("list", []) => {
-            print_list(&list);
+            print_list(&list, None);
+            return Ok(());
+        }
+        ("list", [name]) => {
+            let Some(status) = Status::named(name) else {
+                return Err(format!("'{name}' is not open, doing or done"));
+            };
+            print_list(&list, Some(status));
             return Ok(());
         }
         ("help" | "-h" | "--help", _) => {
@@ -81,7 +89,7 @@ fn run(args: &[String]) -> Result<(), String> {
 
     fs::write(&path, list.to_text())
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
-    print_list(&list);
+    print_list(&list, None);
     Ok(())
 }
 
@@ -141,17 +149,20 @@ fn priority_of(arg: &str) -> Result<Priority, String> {
     ))
 }
 
-fn print_list(list: &TodoList) {
+/// Prints the todos, all of them or only those in one status, under the
+/// numbers the other commands take, then the summary of the whole list.
+fn print_list(list: &TodoList, only: Option<Status>) {
     let total = list.len();
     if total == 0 {
         println!("nothing to do");
         return;
     }
-    let mut i = 0;
-    while i < total {
-        println!("{:>2}. {}", i + 1, list.get(i).line());
-        i += 1;
-    }
+    list.each_index(|index| {
+        let todo = list.get(index);
+        if only.is_none_or(|status| status == todo.status) {
+            println!("{:>2}. {}", index + 1, todo.line());
+        }
+    });
     let progress = list.progress();
     println!(
         "{}/{total} done ({}%), {} left",

@@ -71,3 +71,12 @@ fn status_changed_without_asking_the_rules(todo: &mut Todo, to: Status) -> bool 
     todo.status = to;
     todo.status.can_become(to)
 }
+
+#[should_fail]
+#[spec(fn(&TodoList[@n], visit: F) where F: FnMut(usize{i: i < n}))]
+fn visitor_handed_an_index_past_the_end<F>(list: &TodoList, mut visit: F)
+where
+    F: FnMut(usize),
+{
+    visit(list.len());
+}

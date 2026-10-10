@@ -23,7 +23,7 @@ defs! {
 
 /// Where a todo stands. `reflect` lets the specs talk about the variants.
 #[reflect]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Status {
     Open,
     Doing,
@@ -42,6 +42,11 @@ impl Status {
     #[spec(fn(&Status[@s]) -> bool[s == Status::Done])]
     pub fn is_done(&self) -> bool {
         matches!(self, Status::Done)
+    }
+
+    /// Inverse of `name`.
+    pub fn named(name: &str) -> Option<Status> {
+        Status::ALL.into_iter().find(|status| status.name() == name)
     }
 
     pub fn name(&self) -> &'static str {
@@ -213,13 +218,26 @@ impl TodoList {
     /// Writes the text format that `parse` reads.
     pub fn to_text(&self) -> String {
         let mut text = String::new();
+        self.each_index(|index| {
+            text.push_str(&self.get(index).line());
+            text.push('\n');
+        });
+        text
+    }
+
+    /// Calls `visit` with every index of the list, in order. The closure's
+    /// signature promises it an index that is valid for this list, so it can
+    /// hand the index straight back to `get`.
+    #[spec(fn(&TodoList[@n], visit: F) where F: FnMut(usize{i: i < n}))]
+    pub fn each_index<F>(&self, mut visit: F)
+    where
+        F: FnMut(usize),
+    {
         let mut i = 0;
         while i < self.len() {
-            text.push_str(&self.get(i).line());
-            text.push('\n');
+            visit(i);
             i += 1;
         }
-        text
     }
 
     #[spec(fn(&TodoList[@n]) -> usize[n])]
@@ -295,14 +313,12 @@ impl TodoList {
     /// priority always has a slot: its range is the array's length.
     pub fn open_by_priority(&self) -> [usize; PRIORITY_LEVELS] {
         let mut counts = [0; PRIORITY_LEVELS];
-        let mut i = 0;
-        while i < self.len() {
-            let todo = self.get(i);
+        self.each_index(|index| {
+            let todo = self.get(index);
             if !todo.status.is_done() {
                 counts[(todo.priority - HIGHEST_PRIORITY) as usize] += 1;
             }
-            i += 1;
-        }
+        });
         counts
     }
 

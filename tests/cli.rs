@@ -110,6 +110,31 @@ fn status_follows_the_rules() {
 }
 
 #[test]
+fn list_can_show_one_status_under_the_original_numbers() {
+    let cli = Cli::new("filter");
+    for title in ["a", "b", "c"] {
+        cli.ok(&["add", title]);
+    }
+    cli.ok(&["start", "2"]);
+    cli.ok(&["done", "3"]);
+
+    let summary = "1/3 done (33%), 2 left\n  0 open at !1\n  2 open at !2\n  0 open at !3\n";
+    assert_eq!(
+        cli.ok(&["list", "open"]),
+        format!(" 1. [ ] !2 a\n{summary}")
+    );
+    assert_eq!(
+        cli.ok(&["list", "doing"]),
+        format!(" 2. [~] !2 b\n{summary}")
+    );
+    assert_eq!(
+        cli.ok(&["list", "done"]),
+        format!(" 3. [x] !2 c\n{summary}")
+    );
+    assert!(!cli.run(&["list", "later"]).status.success());
+}
+
+#[test]
 fn priority_is_set_and_kept_in_range() {
     let cli = Cli::new("priority");
     cli.ok(&["add", "a"]);
