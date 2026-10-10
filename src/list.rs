@@ -9,6 +9,11 @@ use std::{cmp::min, collections::BTreeSet, ops::Index};
 use flux_rs::{attrs::*, bitvec::BV32, defs, macros::qualifier};
 
 use crate::rvec::RVec;
+// Only the specs name the allocator, and only Flux reads them; Rust itself
+// sees no use of it.
+#[cfg(flux)]
+#[allow(unused_imports)]
+use std::alloc::Global;
 
 const PRIORITY_TAG: char = '!';
 
@@ -500,30 +505,77 @@ fn split_priority(rest: &str) -> (Priority, &str) {
 /// The todos picked for one command, by index. Flux tracks the set of
 /// indices itself, not just how many there are, so it knows which index is
 /// in and which is not; `need` is the shortest list all of them are in.
-#[opaque]
 #[refined_by(picked: Set<int>, need: int)]
 #[invariant(need >= 0)]
-pub struct Picks(BTreeSet<usize>);
+pub struct Picks {
+    #[field(BTreeSet<usize, Global>[picked])]
+    set: BTreeSet<usize>,
+    // One past the largest index picked. In u128 that cannot overflow,
+    // whatever the index.
+    #[field(u128[need])]
+    need: u128,
+}
 
 impl Picks {
-    #[trusted]
     #[spec(fn() -> Picks[set_empty(0), 0])]
     pub fn none() -> Picks {
-        Picks(BTreeSet::new())
+        Picks {
+            set: BTreeSet::new(),
+            need: 0,
+        }
     }
 
     /// Adds an index, and says whether it was new.
-    #[trusted]
     #[spec(fn(self: &mut Picks[@p], usize[@index]) -> bool[!set_is_in(index, p.picked)]
            ensures self: Picks[set_union(set_singleton(index), p.picked), need_with(p.need, index)])]
     pub fn pick(&mut self, index: usize) -> bool {
-        self.0.insert(index)
+        let past = index as u128 + 1;
+        if past > self.need {
+            self.need = past;
+        }
+        self.set.insert(index)
     }
 
+    // `BTreeSet::contains` takes any borrowed form of the element, which a
+    // spec over the set's own elements cannot be written for.
     #[trusted]
     #[spec(fn(&Picks[@p], usize[@index]) -> bool[set_is_in(index, p.picked)])]
     pub fn contains(&self, index: usize) -> bool {
-        self.0.contains(&index)
+        self.set.contains(&index)
+    }
+}
+
+/// What std's `BTreeSet` is and does, said with a set in its type. The
+/// struct itself gets the refinement here, from outside. Only Flux reads
+/// this, so the unstable `Allocator` it must name never reaches a normal
+/// build.
+#[cfg(flux)]
+mod set_specs {
+    #[allow(unused_imports)]
+    use std::{
+        alloc::{AllocatorClone, Global},
+        collections::BTreeSet,
+    };
+
+    use flux_rs::attrs::*;
+
+    #[extern_spec(std::collections)]
+    #[refined_by(elems: Set<T>)]
+    struct BTreeSet<T, A: AllocatorClone>;
+
+    #[extern_spec(std::collections)]
+    impl<T> BTreeSet<T> {
+        #[spec(fn() -> BTreeSet<T, Global>[set_empty(0)])]
+        fn new() -> BTreeSet<T>;
+    }
+
+    #[extern_spec(std::collections)]
+    impl<T, A: AllocatorClone> BTreeSet<T, A> {
+        #[spec(fn(self: &mut BTreeSet<T, A>[@s], T[@value]) -> bool[!set_is_in(value, s)]
+               ensures self: BTreeSet<T, A>[set_union(set_singleton(value), s)])]
+        fn insert(&mut self, value: T) -> bool
+        where
+            T: Ord;
     }
 }
 

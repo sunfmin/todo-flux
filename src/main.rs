@@ -1,5 +1,7 @@
 //! `todo` — a command-line todo list whose rules are verified by Flux.
 
+#![cfg_attr(flux, feature(allocator_ext))]
+
 // Linking these crates is what brings the std refinement specs into scope.
 extern crate flux_alloc;
 extern crate flux_core;
