@@ -554,6 +554,28 @@ mod picks_theorems {
     }
 }
 
+/// A choice of todos out of a list, made by number or by what they are.
+/// `need` is the shortest list the choice can be made from. Unless an
+/// implementation says otherwise that is no length at all: a choice by what
+/// the todos are fits any list.
+#[assoc(fn need(selection: Self) -> int { 0 })]
+pub trait Selection {
+    fn has(&self, index: usize, todo: &Todo) -> bool;
+}
+
+impl Selection for StatusSet {
+    fn has(&self, _index: usize, todo: &Todo) -> bool {
+        self.contains(todo.status)
+    }
+}
+
+#[assoc(fn need(picks: Picks) -> int { picks.need })]
+impl Selection for Picks {
+    fn has(&self, index: usize, _todo: &Todo) -> bool {
+        self.contains(index)
+    }
+}
+
 /// How many of a number of todos are done. The invariant makes a count
 /// with more done than there are impossible to build, so everything derived
 /// from it is safe arithmetic.
@@ -759,12 +781,12 @@ impl TodoList {
         counts
     }
 
-    /// Takes the picked todos out of the list and returns them in the order
+    /// Takes the chosen todos out of the list and returns them in the order
     /// they had. The list shrinks by exactly as many todos as come back:
     /// none is lost and none is taken twice. Walking from the end keeps every index still to visit valid
     /// while the list shrinks under it.
-    #[spec(fn(self: &mut TodoList[@n], &Picks{p: p.need <= n}) -> Vec<Todo>[#taken] ensures self: TodoList[n - taken])]
-    pub fn remove_all(&mut self, picks: &Picks) -> Vec<Todo> {
+    #[spec(fn(self: &mut TodoList[@n], &S{s: <S as Selection>::need(s) <= n}) -> Vec<Todo>[#taken] ensures self: TodoList[n - taken])]
+    pub fn remove_all<S: Selection>(&mut self, chosen: &S) -> Vec<Todo> {
         let mut removed = Vec::new();
         let mut index = self.len();
         while index > 0 {
@@ -772,7 +794,7 @@ impl TodoList {
             // the todos left and the todos taken add up to the original list.
             qualifier!(left: int, taken: int, all: int; left + taken == all);
             index -= 1;
-            if picks.contains(index) {
+            if chosen.has(index, &self.items[index]) {
                 removed.push(self.items.remove(index));
             }
         }

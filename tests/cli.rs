@@ -232,6 +232,25 @@ fn rm_takes_several_numbers_but_none_twice() {
 }
 
 #[test]
+fn clear_removes_every_done_todo() {
+    let cli = Cli::new("clear");
+    for title in ["a", "b", "c"] {
+        cli.ok(&["add", title]);
+    }
+    cli.ok(&["done", "1"]);
+    cli.ok(&["start", "2"]);
+    cli.ok(&["done", "3"]);
+    assert!(
+        cli.ok(&["clear"])
+            .starts_with("removed: a\nremoved: c\n 1. [~] !2 b\n")
+    );
+    assert_eq!(cli.stored(), "[~] !2 b\n");
+
+    assert!(cli.ok(&["clear"]).starts_with(" 1. [~] !2 b\n"));
+    assert!(!cli.run(&["clear", "1"]).status.success());
+}
+
+#[test]
 fn out_of_range_positions_are_rejected_without_changing_the_file() {
     let cli = Cli::new("out-of-range");
     cli.ok(&["add", "only one"]);
