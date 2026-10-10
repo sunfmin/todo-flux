@@ -8,6 +8,8 @@ use std::{cmp::min, collections::BTreeSet, ops::Index};
 
 use flux_rs::{attrs::*, bitvec::BV32, defs, macros::qualifier};
 
+use crate::rvec::RVec;
+
 const PRIORITY_TAG: char = '!';
 
 pub const HIGHEST_PRIORITY: u8 = 1;
@@ -495,24 +497,6 @@ fn split_priority(rest: &str) -> (Priority, &str) {
     (DEFAULT_PRIORITY, rest)
 }
 
-/// `flux-alloc` has no specs for `Vec::remove` and `Vec::insert` yet. Only Flux reads this, so
-/// the unstable `Allocator` it must name never reaches a normal build.
-#[cfg(flux)]
-mod vec_specs {
-    use std::alloc::Allocator;
-
-    use flux_rs::attrs::*;
-
-    #[extern_spec]
-    impl<T, A: Allocator> Vec<T, A> {
-        #[spec(fn(self: &mut Vec<T, A>[@n], usize{i: i < n}) -> T ensures self: Vec<T, A>[n - 1])]
-        fn remove(&mut self, index: usize) -> T;
-
-        #[spec(fn(self: &mut Vec<T, A>[@n], usize{i: i <= n}, T) ensures self: Vec<T, A>[n + 1])]
-        fn insert(&mut self, index: usize, element: T);
-    }
-}
-
 /// The todos picked for one command, by index. Flux tracks the set of
 /// indices itself, not just how many there are, so it knows which index is
 /// in and which is not; `need` is the shortest list all of them are in.
@@ -648,15 +632,15 @@ impl Progress {
 #[refined_by(len: int)]
 #[invariant(len >= 0)]
 pub struct TodoList {
-    #[field(Vec<Todo>[len])]
-    items: Vec<Todo>,
+    #[field(RVec<Todo>[len])]
+    items: RVec<Todo>,
 }
 
 impl TodoList {
     #[spec(fn() -> TodoList[0])]
     #[no_panic]
     pub fn new() -> TodoList {
-        TodoList { items: Vec::new() }
+        TodoList { items: RVec::new() }
     }
 
     /// Reads the text format: one todo per line, lines without a title ignored.
@@ -724,13 +708,15 @@ impl TodoList {
     /// Moves a todo to another status if the rules allow it, and says
     /// whether it did.
     #[spec(fn(&mut TodoList[@n], usize{i: i < n}, to: Status) -> bool)]
+    #[no_panic]
     pub fn set_status(&mut self, index: usize, to: Status) -> bool {
-        self.items[index].try_become(to)
+        self.items.get_mut(index).try_become(to)
     }
 
     #[spec(fn(&mut TodoList[@n], usize{i: i < n}, Priority))]
+    #[no_panic]
     pub fn set_priority(&mut self, index: usize, priority: Priority) {
-        self.items[index].set_priority(priority);
+        self.items.get_mut(index).set_priority(priority);
     }
 
     /// Moves a todo to another position. The list keeps its length: nothing
@@ -766,8 +752,9 @@ impl TodoList {
     /// The todos as a slice whose length is the list's, so that walking it
     /// with `enumerate` yields indices proved to be in the list.
     #[spec(fn(&TodoList[@n]) -> &[Todo][n])]
+    #[no_panic]
     fn todos(&self) -> &[Todo] {
-        &self.items
+        self.items.as_slice()
     }
 
     /// The todo to work on next: the first one not done among those of the
@@ -833,7 +820,7 @@ impl TodoList {
             // the todos left and the todos taken add up to the original list.
             qualifier!(left: int, taken: int, all: int; left + taken == all);
             index -= 1;
-            if chosen.has(S::key(index, &self.items[index])) {
+            if chosen.has(S::key(index, self.items.get(index))) {
                 removed.push(self.items.remove(index));
             }
         }
@@ -855,7 +842,8 @@ impl Index<usize> for TodoList {
     type Output = Todo;
 
     #[spec(fn(&TodoList[@list], index: usize{<TodoList as Index<usize>>::in_bounds(list, index)}) -> &Todo)]
+    #[no_panic]
     fn index(&self, index: usize) -> &Todo {
-        &self.items[index]
+        self.items.get(index)
     }
 }

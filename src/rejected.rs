@@ -122,9 +122,9 @@ fn command_for_one_past_the_end(_list: &TodoList, index: usize) -> Command {
 
 #[should_fail]
 #[no_panic]
-#[spec(fn(&TodoList[@n], usize{i: i < n}) -> bool)]
-fn vec_access_claimed_not_to_panic(list: &TodoList, index: usize) -> bool {
-    list[index].status.is_done()
+#[spec(fn(&Vec<Todo>[@n], usize{i: i < n}) -> bool)]
+fn std_vec_access_claimed_not_to_panic(todos: &Vec<Todo>, index: usize) -> bool {
+    todos[index].status.is_done()
 }
 
 #[should_fail]

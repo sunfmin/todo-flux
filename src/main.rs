@@ -7,6 +7,7 @@ extern crate flux_core;
 mod list;
 #[cfg(flux)]
 mod rejected;
+mod rvec;
 
 use std::{
     env, fs,
