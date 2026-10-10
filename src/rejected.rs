@@ -120,3 +120,9 @@ fn vec_access_claimed_not_to_panic(list: &TodoList, index: usize) -> bool {
 fn a_status_reported_unequal_to_itself(status: Status) -> bool {
     status == status
 }
+
+#[should_fail]
+#[spec(fn(&Todo) -> Option<usize{slot: slot < 2}>)]
+fn status_slot_claimed_to_fit_two_slots(todo: &Todo) -> Option<usize> {
+    Some(todo.status.slot())
+}
