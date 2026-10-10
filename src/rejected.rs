@@ -114,3 +114,9 @@ fn command_for_one_past_the_end(_list: &TodoList, index: usize) -> Command {
 fn vec_access_claimed_not_to_panic(list: &TodoList, index: usize) -> bool {
     list[index].status.is_done()
 }
+
+#[should_fail]
+#[spec(fn(Status) -> bool[false])]
+fn a_status_reported_unequal_to_itself(status: Status) -> bool {
+    status == status
+}

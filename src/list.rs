@@ -29,11 +29,22 @@ defs! {
 /// Where a todo stands. `reflect` lets the specs talk about the variants.
 #[reflect]
 #[derive(Clone, Copy, PartialEq)]
+#[trusted_derive(reason = "Flux cannot check the discriminant comparison derive writes")]
 pub enum Status {
     Open,
     Doing,
     Done,
 }
+
+// `==` on statuses is written by `derive`, so there is no function to put a
+// spec on. A detached spec attaches one from outside: `==` is true exactly
+// for equal statuses. The derived body is trusted to do that.
+#[specs {
+    impl std::cmp::PartialEq for Status {
+        fn eq(&Status[@a], &Status[@b]) -> bool[a == b];
+    }
+}]
+const _: () = ();
 
 impl Status {
     const ALL: [Status; 3] = [Status::Open, Status::Doing, Status::Done];
