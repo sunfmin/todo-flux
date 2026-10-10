@@ -311,36 +311,38 @@ pub struct StatusSet {
     bits: BV32,
 }
 
-// What a `StatusSet` is to Flux, detached from the struct, which stays the
-// plain Rust above.
+// What a `StatusSet` is to Flux and what its functions do to the bits,
+// detached from the struct and its impl, which stay plain Rust.
 #[specs {
     #[refined_by(bits: bitvec<32>)]
     #[invariant(only_status_bits(bits))]
     struct StatusSet {
         bits: {BV32[bits] | only_status_bits(bits)},
     }
+    impl StatusSet {
+        fn none() -> StatusSet[0];
+        fn with(set: StatusSet[@bits], status: Status) -> StatusSet[bits | bit_of(status)];
+        fn contains(set: &StatusSet[@bits], status: Status) -> bool[bits & bit_of(status) != 0];
+        fn all() -> StatusSet[STATUS_BITS];
+    }
 }]
 const _: () = ();
 
 impl StatusSet {
-    #[spec(fn() -> StatusSet[0])]
     pub fn none() -> StatusSet {
         StatusSet { bits: BV32::new(0) }
     }
 
-    #[spec(fn(StatusSet[@bits], Status[@status]) -> StatusSet[bits | bit_of(status)])]
     pub fn with(self, status: Status) -> StatusSet {
         StatusSet {
             bits: self.bits | status.bit(),
         }
     }
 
-    #[spec(fn(&StatusSet[@bits], Status[@status]) -> bool[bits & bit_of(status) != 0])]
     pub fn contains(&self, status: Status) -> bool {
         self.bits & status.bit() != 0
     }
 
-    #[spec(fn() -> StatusSet[STATUS_BITS])]
     pub fn all() -> StatusSet {
         StatusSet { bits: STATUS_BITS }
     }
