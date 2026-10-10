@@ -8,7 +8,7 @@
 
 use flux_rs::{attrs::*, defs};
 
-use crate::list::{Progress, Status, Todo, TodoList};
+use crate::list::{Progress, Status, Title, Todo, TodoList};
 
 defs! {
     use crate::list::can_become;
@@ -79,4 +79,10 @@ where
     F: FnMut(usize),
 {
     visit(list.len());
+}
+
+#[should_fail]
+#[spec(fn(&Title) -> usize[0])]
+fn title_with_nothing_on_it(title: &Title) -> usize {
+    title.chars()
 }
