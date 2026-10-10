@@ -12,6 +12,7 @@ mod rejected;
 mod rvec;
 
 use std::{
+    cmp::max,
     env, fs,
     io::{self, Write},
     path::PathBuf,
@@ -295,7 +296,7 @@ fn number_width(total: usize) -> usize {
         rest /= 10;
         width += 1;
     }
-    if width < 2 { 2 } else { width }
+    max(width, 2)
 }
 
 fn print_removed(out: &mut dyn Write, removed: Removed) -> io::Result<()> {

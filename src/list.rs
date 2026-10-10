@@ -371,6 +371,13 @@ mod cmp_specs {
     #[extern_spec(std::cmp)]
     #[spec(fn[hrn p: T -> bool](T{v: p(v)}, T{v: p(v)}) -> T{v: p(v)})]
     fn min<T: Ord>(a: T, b: T) -> T;
+
+    // The larger of two values is what their type's `Ord` says it is. For
+    // `usize` that is the larger number exactly, so a caller knows it is no
+    // less than either argument.
+    #[extern_spec(std::cmp)]
+    #[spec(fn(T[@a], T[@b]) -> T{v: <T as Ord>::max_res(a, b, v)})]
+    fn max<T: Ord>(a: T, b: T) -> T;
 }
 
 /// Every priority, most urgent first. Whatever the iterator is made of, each
