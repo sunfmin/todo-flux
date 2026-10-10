@@ -17,8 +17,8 @@ use std::{
 
 use flux_rs::attrs::*;
 use list::{
-    HIGHEST_PRIORITY, LOWEST_PRIORITY, Priority, Status, StatusSet, Title, TodoList, priorities,
-    priority, slot,
+    HIGHEST_PRIORITY, LOWEST_PRIORITY, Picks, Priority, Status, StatusSet, Title, TodoList,
+    priorities, priority, slot,
 };
 
 const USAGE: &str = "\
@@ -31,7 +31,7 @@ usage: todo [list]          show all todos
        todo undo <n>        mark todo n as open again
        todo pri <n> <1-3>   set the priority of todo n (1 is highest)
        todo mv <n> <m>      move todo n to position m
-       todo rm <n>          delete todo n
+       todo rm <n>..        delete the todos numbered
 
 Todos are stored in $TODO_FILE (default: ~/.todo.txt).";
 
@@ -69,8 +69,8 @@ enum Command {
     SetPriority(usize, Priority),
     #[variant((usize[@from], usize[@to]) -> Command[if from > to { from + 1 } else { to + 1 }])]
     Move(usize, usize),
-    #[variant((usize[@index]) -> Command[index + 1])]
-    Remove(usize),
+    #[variant((Picks[@picks]) -> Command[picks.need])]
+    Remove(Picks),
 }
 
 /// Runs one command, writing what the user should see to `out`. Taking the
@@ -106,9 +106,10 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
         }
         Command::SetPriority(index, priority) => list.set_priority(index, priority),
         Command::Move(from, to) => list.move_to(from, to),
-        Command::Remove(index) => {
-            let removed = list.remove(index);
-            written(writeln!(out, "removed: {}", removed.title.as_str()))?;
+        Command::Remove(picks) => {
+            for removed in list.remove_all(&picks) {
+                written(writeln!(out, "removed: {}", removed.title.as_str()))?;
+            }
         }
     }
 
@@ -149,7 +150,15 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
             priority_of(level)?,
         )),
         ("mv", [n, m]) => Ok(Command::Move(index_of(list, n)?, index_of(list, m)?)),
-        ("rm", [n]) => Ok(Command::Remove(index_of(list, n)?)),
+        ("rm", numbers) if !numbers.is_empty() => {
+            let mut picks = Picks::none();
+            for n in numbers {
+                if !picks.pick(index_of(list, n)?) {
+                    return Err(format!("todo {n} is named twice"));
+                }
+            }
+            Ok(Command::Remove(picks))
+        }
         _ => Err(format!("cannot run '{}'\n{USAGE}", args.join(" "))),
     }
 }

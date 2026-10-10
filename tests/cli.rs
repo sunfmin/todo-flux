@@ -208,6 +208,30 @@ fn mv_reorders_without_losing_todos() {
 }
 
 #[test]
+fn rm_takes_several_numbers_but_none_twice() {
+    let cli = Cli::new("rm-several");
+    for title in ["a", "b", "c", "d"] {
+        cli.ok(&["add", title]);
+    }
+    assert!(
+        cli.ok(&["rm", "4", "1", "3"])
+            .starts_with("removed: a\nremoved: c\nremoved: d\n 1. [ ] !2 b\n")
+    );
+    assert_eq!(cli.stored(), "[ ] !2 b\n");
+
+    cli.ok(&["add", "e"]);
+    for args in [&["rm", "1", "1"][..], &["rm", "1", "3"], &["rm"]] {
+        assert!(!cli.run(args).status.success(), "{args:?}");
+    }
+    let out = cli.run(&["rm", "2", "1", "2"]);
+    assert_eq!(
+        String::from_utf8_lossy(&out.stderr),
+        "todo: todo 2 is named twice\n"
+    );
+    assert_eq!(cli.stored(), "[ ] !2 b\n[ ] !2 e\n");
+}
+
+#[test]
 fn out_of_range_positions_are_rejected_without_changing_the_file() {
     let cli = Cli::new("out-of-range");
     cli.ok(&["add", "only one"]);

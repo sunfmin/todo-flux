@@ -1,10 +1,10 @@
 //! The todo list and its on-disk text format.
 //!
 //! Flux tracks the list's length in its type, so every index handed to
-//! indexing, `set_status` or `remove` is proved in bounds at compile time. The
+//! indexing, `set_status` or `move_to` is proved in bounds at compile time. The
 //! only way to obtain such an index from untrusted input is `locate`.
 
-use std::ops::Index;
+use std::{collections::BTreeSet, ops::Index};
 
 use flux_rs::{attrs::*, bitvec::BV32, defs, macros::invariant};
 
@@ -410,6 +410,59 @@ mod vec_specs {
     }
 }
 
+/// The todos picked for one command, by index. Flux tracks the set of
+/// indices itself, not just how many there are, so it knows which index is
+/// in and which is not; `need` is the shortest list all of them are in.
+#[opaque]
+#[refined_by(picked: Set<int>, need: int)]
+pub struct Picks(BTreeSet<usize>);
+
+impl Picks {
+    #[trusted]
+    #[spec(fn() -> Picks[set_empty(0), 0])]
+    pub fn none() -> Picks {
+        Picks(BTreeSet::new())
+    }
+
+    /// Adds an index, and says whether it was new.
+    #[trusted]
+    #[spec(fn(self: &mut Picks[@p], usize[@index]) -> bool[!set_is_in(index, p.picked)]
+           ensures self: Picks[set_union(set_singleton(index), p.picked), if index < p.need { p.need } else { index + 1 }])]
+    pub fn pick(&mut self, index: usize) -> bool {
+        self.0.insert(index)
+    }
+
+    #[trusted]
+    #[spec(fn(&Picks[@p], usize[@index]) -> bool[set_is_in(index, p.picked)])]
+    pub fn contains(&self, index: usize) -> bool {
+        self.0.contains(&index)
+    }
+}
+
+/// What the set of picked indices lets Flux prove about any picks at all.
+/// Only Flux compiles these.
+#[cfg(flux)]
+mod picks_theorems {
+    #![allow(dead_code)]
+
+    use flux_rs::attrs::*;
+
+    use super::Picks;
+
+    #[spec(fn(Picks, usize) -> bool[false])]
+    fn an_index_cannot_be_picked_twice(mut picks: Picks, index: usize) -> bool {
+        picks.pick(index);
+        picks.pick(index)
+    }
+
+    #[spec(fn(Picks, usize[@index], usize{other: other != index}) -> bool[true])]
+    fn picking_one_index_picks_no_other(mut picks: Picks, index: usize, other: usize) -> bool {
+        let before = picks.contains(other);
+        picks.pick(index);
+        picks.contains(other) == before
+    }
+}
+
 /// How many of a number of todos are done. The invariant makes a count
 /// with more done than there are impossible to build, so everything derived
 /// from it is safe arithmetic.
@@ -610,9 +663,21 @@ impl TodoList {
         counts
     }
 
-    #[spec(fn(self: &mut TodoList[@n], usize{i: i < n}) -> Todo ensures self: TodoList[n - 1])]
-    pub fn remove(&mut self, index: usize) -> Todo {
-        self.items.remove(index)
+    /// Takes the picked todos out of the list and returns them in the order
+    /// they had. Walking from the end keeps every index still to visit valid
+    /// while the list shrinks under it.
+    #[spec(fn(self: &mut TodoList[@n], &Picks{p: p.need <= n}) -> Vec<Todo> ensures self: TodoList{v: v.len <= n})]
+    pub fn remove_all(&mut self, picks: &Picks) -> Vec<Todo> {
+        let mut removed = Vec::new();
+        let mut index = self.len();
+        while index > 0 {
+            index -= 1;
+            if picks.contains(index) {
+                removed.push(self.items.remove(index));
+            }
+        }
+        removed.reverse();
+        removed
     }
 
     #[spec(fn(self: &mut TodoList[@n], Todo) ensures self: TodoList[n + 1])]
