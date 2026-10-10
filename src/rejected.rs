@@ -51,3 +51,11 @@ fn percent_of_empty_list() -> usize {
 fn more_done_than_there_are() -> Progress {
     Progress { done: 3, total: 2 }
 }
+
+#[should_fail]
+fn priority_used_as_slot_without_offset(list: &TodoList) -> usize {
+    match list.locate(1) {
+        Some(index) => list.open_by_priority()[list.get(index).priority as usize],
+        None => 0,
+    }
+}

@@ -150,4 +150,11 @@ fn print_list(list: &TodoList) {
         progress.percent(),
         progress.left()
     );
+    let open = list.open_by_priority();
+    let mut level = 0;
+    while level < open.len() {
+        let priority = HIGHEST_PRIORITY as usize + level;
+        println!("  {} open at !{priority}", open[level]);
+        level += 1;
+    }
 }

@@ -13,6 +13,7 @@ const PRIORITY_TAG: char = '!';
 pub const HIGHEST_PRIORITY: u8 = 1;
 pub const LOWEST_PRIORITY: u8 = 3;
 const DEFAULT_PRIORITY: Priority = 2;
+pub const PRIORITY_LEVELS: usize = (LOWEST_PRIORITY - HIGHEST_PRIORITY + 1) as usize;
 
 // The rules of this module, named once and used by the specs below.
 defs! {
@@ -227,6 +228,21 @@ impl TodoList {
             i += 1;
         }
         Progress { done, total }
+    }
+
+    /// How many open todos there are at each priority, highest first. A
+    /// priority always has a slot: its range is the array's length.
+    pub fn open_by_priority(&self) -> [usize; PRIORITY_LEVELS] {
+        let mut counts = [0; PRIORITY_LEVELS];
+        let mut i = 0;
+        while i < self.len() {
+            let todo = self.get(i);
+            if !todo.done {
+                counts[(todo.priority - HIGHEST_PRIORITY) as usize] += 1;
+            }
+            i += 1;
+        }
+        counts
     }
 
     #[spec(fn(self: &mut TodoList[@n], usize{i: i < n}) -> Todo ensures self: TodoList[n - 1])]
