@@ -15,7 +15,7 @@ use std::{
     process::ExitCode,
 };
 
-use flux_rs::{attrs::*, defs, macros::qualifier};
+use flux_rs::{attrs::*, defs, macros::invariant};
 use list::{
     HIGHEST_PRIORITY, LOWEST_PRIORITY, Picks, Priority, Status, StatusSet, Title, Todo, TodoList,
     priorities, priority, slot,
@@ -249,7 +249,7 @@ fn number_width(total: usize) -> usize {
     while rest >= 10 {
         // What stays true on every turn, which Flux does not find alone:
         // each digit counted was taken off what is left of the number.
-        qualifier!(width: int, rest: int, total: int; width + rest <= total + 1);
+        invariant!(width: int, rest: int; width <= total - rest + 1);
         rest /= 10;
         width += 1;
     }
