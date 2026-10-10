@@ -1,8 +1,10 @@
 //! The todo list and its on-disk text format.
 //!
 //! Flux tracks the list's length in its type, so every index handed to
-//! `get`, `set_status` or `remove` is proved in bounds at compile time. The
+//! indexing, `set_status` or `remove` is proved in bounds at compile time. The
 //! only way to obtain such an index from untrusted input is `locate`.
+
+use std::ops::Index;
 
 use flux_rs::{attrs::*, defs, macros::invariant};
 
@@ -281,7 +283,7 @@ impl TodoList {
     pub fn to_text(&self) -> String {
         let mut text = String::new();
         self.each_index(|index| {
-            text.push_str(&self.get(index).line());
+            text.push_str(&self[index].line());
             text.push('\n');
         });
         text
@@ -328,11 +330,6 @@ impl TodoList {
         }
     }
 
-    #[spec(fn(&TodoList[@n], usize{i: i < n}) -> &Todo)]
-    pub fn get(&self, index: usize) -> &Todo {
-        &self.items[index]
-    }
-
     /// Moves a todo to another status if the rules allow it, and says
     /// whether it did.
     #[spec(fn(&mut TodoList[@n], usize{i: i < n}, to: Status) -> bool)]
@@ -360,7 +357,7 @@ impl TodoList {
         let mut done = 0;
         for i in 0..total {
             invariant!(done: int; done <= i);
-            if self.get(i).status.is_done() {
+            if self[i].status.is_done() {
                 done += 1;
             }
         }
@@ -375,7 +372,7 @@ impl TodoList {
     pub fn open_by_priority(&self) -> [usize; PRIORITY_LEVELS] {
         let mut counts = [0; PRIORITY_LEVELS];
         self.each_index(|index| {
-            let todo = self.get(index);
+            let todo = &self[index];
             if !todo.status.is_done() {
                 counts[slot(todo.priority)] += 1;
             }
@@ -391,5 +388,18 @@ impl TodoList {
     #[spec(fn(self: &mut TodoList[@n], Todo) ensures self: TodoList[n + 1])]
     fn push(&mut self, todo: Todo) {
         self.items.push(todo);
+    }
+}
+
+/// `list[index]`, for an index Flux can prove is in the list. `in_bounds` is
+/// the associated refinement the `Index` trait asks every implementation to
+/// define: it is what makes the proof work for the indexing syntax.
+#[assoc(fn in_bounds(list: TodoList, index: int) -> bool { index < list.len })]
+impl Index<usize> for TodoList {
+    type Output = Todo;
+
+    #[spec(fn(&TodoList[@list], index: usize{<TodoList as Index<usize>>::in_bounds(list, index)}) -> &Todo)]
+    fn index(&self, index: usize) -> &Todo {
+        &self.items[index]
     }
 }
