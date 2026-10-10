@@ -251,6 +251,16 @@ fn clear_removes_every_done_todo() {
 }
 
 #[test]
+fn numbers_line_up_in_a_long_list() {
+    let cli = Cli::new("long");
+    fs::write(&cli.file, "[ ] !2 t\n".repeat(100)).unwrap();
+    let out = cli.ok(&["list"]);
+    assert!(out.starts_with("  1. [ ] !2 t\n  2. [ ] !2 t\n"));
+    assert!(out.contains("\n 99. [ ] !2 t\n100. [ ] !2 t\n"));
+    assert_eq!(cli.ok(&["next"]), "  1. [ ] !2 t\n");
+}
+
+#[test]
 fn out_of_range_positions_are_rejected_without_changing_the_file() {
     let cli = Cli::new("out-of-range");
     cli.ok(&["add", "only one"]);

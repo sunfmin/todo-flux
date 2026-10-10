@@ -15,7 +15,7 @@ use std::{
     process::ExitCode,
 };
 
-use flux_rs::{attrs::*, defs};
+use flux_rs::{attrs::*, defs, macros::qualifier};
 use list::{
     HIGHEST_PRIORITY, LOWEST_PRIORITY, Picks, Priority, Status, StatusSet, Title, Todo, TodoList,
     priorities, priority, slot,
@@ -106,7 +106,13 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
         }
         Command::Next => {
             return written(match list.next() {
-                Some(index) => writeln!(out, "{:>2}. {}", list.position(index), list[index].line()),
+                Some(index) => writeln!(
+                    out,
+                    "{:>width$}. {}",
+                    list.position(index),
+                    list[index].line(),
+                    width = number_width(list.len())
+                ),
                 None => writeln!(out, "nothing to do"),
             });
         }
@@ -234,6 +240,22 @@ fn written(result: io::Result<()>) -> Result<(), String> {
     }
 }
 
+/// How many characters the numbers of a list of `total` todos are printed
+/// in, so that they line up: as many as the largest takes, and at least two.
+#[spec(fn(total: usize) -> usize{width: 2 <= width && width <= total + 2})]
+fn number_width(total: usize) -> usize {
+    let mut width = 1;
+    let mut rest = total;
+    while rest >= 10 {
+        // What stays true on every turn, which Flux does not find alone:
+        // each digit counted was taken off what is left of the number.
+        qualifier!(width: int, rest: int, total: int; width + rest <= total + 1);
+        rest /= 10;
+        width += 1;
+    }
+    if width < 2 { 2 } else { width }
+}
+
 fn print_removed(out: &mut dyn Write, removed: Vec<Todo>) -> io::Result<()> {
     for todo in removed {
         writeln!(out, "removed: {}", todo.title.as_str())?;
@@ -248,11 +270,12 @@ fn print_list(out: &mut dyn Write, list: &TodoList, only: StatusSet) -> io::Resu
     if total == 0 {
         return writeln!(out, "nothing to do");
     }
+    let width = number_width(total);
     let mut result = Ok(());
     list.each_index(|index| {
         let todo = &list[index];
         if result.is_ok() && only.contains(todo.status) {
-            result = writeln!(out, "{:>2}. {}", list.position(index), todo.line());
+            result = writeln!(out, "{:>width$}. {}", list.position(index), todo.line());
         }
     });
     result?;
