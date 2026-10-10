@@ -8,7 +8,12 @@ mod list;
 #[cfg(flux)]
 mod rejected;
 
-use std::{env, fs, io, path::PathBuf, process::ExitCode};
+use std::{
+    env, fs,
+    io::{self, Write},
+    path::PathBuf,
+    process::ExitCode,
+};
 
 use flux_rs::attrs::*;
 use list::{
@@ -34,7 +39,7 @@ Todos are stored in $TODO_FILE (default: ~/.todo.txt).";
 #[flux_rs::ignore]
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
-    match run(&args) {
+    match run(&args, &mut io::stdout().lock()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             eprintln!("todo: {message}");
@@ -65,18 +70,18 @@ enum Command {
     Remove(usize),
 }
 
-fn run(args: &[String]) -> Result<(), String> {
+/// Runs one command, writing what the user should see to `out`. Taking the
+/// output as a trait object keeps this function free of the terminal.
+fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
     let path = todo_file()?;
     let mut list = load(&path)?;
 
     match parse(&list, args)? {
         Command::List(only) => {
-            print_list(&list, only);
-            return Ok(());
+            return written(print_list(out, &list, only));
         }
         Command::Help => {
-            println!("{USAGE}");
-            return Ok(());
+            return written(writeln!(out, "{USAGE}"));
         }
         Command::Add(title) => list.add(title),
         Command::SetStatus(index, to) => {
@@ -92,13 +97,15 @@ fn run(args: &[String]) -> Result<(), String> {
         }
         Command::SetPriority(index, priority) => list.set_priority(index, priority),
         Command::Move(from, to) => list.move_to(from, to),
-        Command::Remove(index) => println!("removed: {}", list.remove(index).title.as_str()),
+        Command::Remove(index) => {
+            let removed = list.remove(index);
+            written(writeln!(out, "removed: {}", removed.title.as_str()))?;
+        }
     }
 
     fs::write(&path, list.to_text())
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
-    print_list(&list, None);
-    Ok(())
+    written(print_list(out, &list, None))
 }
 
 /// Reads the arguments as a command that `list` is long enough for.
@@ -175,29 +182,40 @@ fn priority_of(arg: &str) -> Result<Priority, String> {
     ))
 }
 
+/// A reader that stops early, as in `todo list | head -1`, is not an error.
+fn written(result: io::Result<()>) -> Result<(), String> {
+    match result {
+        Err(e) if e.kind() != io::ErrorKind::BrokenPipe => Err(format!("cannot write output: {e}")),
+        _ => Ok(()),
+    }
+}
+
 /// Prints the todos, all of them or only those in one status, under the
 /// numbers the other commands take, then the summary of the whole list.
-fn print_list(list: &TodoList, only: Option<Status>) {
+fn print_list(out: &mut dyn Write, list: &TodoList, only: Option<Status>) -> io::Result<()> {
     let total = list.len();
     if total == 0 {
-        println!("nothing to do");
-        return;
+        return writeln!(out, "nothing to do");
     }
+    let mut result = Ok(());
     list.each_index(|index| {
         let todo = &list[index];
-        if only.is_none_or(|status| status == todo.status) {
-            println!("{:>2}. {}", index + 1, todo.line());
+        if result.is_ok() && only.is_none_or(|status| status == todo.status) {
+            result = writeln!(out, "{:>2}. {}", index + 1, todo.line());
         }
     });
+    result?;
     let progress = list.progress();
-    println!(
+    writeln!(
+        out,
         "{}/{total} done ({}%), {} left",
         progress.done,
         progress.percent(),
         progress.left()
-    );
+    )?;
     let open = list.open_by_priority();
     for priority in priorities() {
-        println!("  {} open at !{priority}", open[slot(priority)]);
+        writeln!(out, "  {} open at !{priority}", open[slot(priority)])?;
     }
+    Ok(())
 }
