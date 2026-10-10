@@ -15,7 +15,7 @@ use std::{
     process::ExitCode,
 };
 
-use flux_rs::attrs::*;
+use flux_rs::{attrs::*, defs};
 use list::{
     HIGHEST_PRIORITY, LOWEST_PRIORITY, Picks, Priority, Status, StatusSet, Title, TodoList,
     priorities, priority, slot,
@@ -49,6 +49,10 @@ fn main() -> ExitCode {
     }
 }
 
+defs! {
+    use crate::list::need_with;
+}
+
 /// What the user asked for, with every todo number already turned into an
 /// index. The refinement `need` is the shortest list the command can run on,
 /// so a command that `parse` checked against a list runs on it with no
@@ -67,7 +71,7 @@ enum Command {
     SetStatus(usize, Status),
     #[variant((usize[@index], Priority) -> Command[index + 1])]
     SetPriority(usize, Priority),
-    #[variant((usize[@from], usize[@to]) -> Command[if from > to { from + 1 } else { to + 1 }])]
+    #[variant((usize[@from], usize[@to]) -> Command[need_with(from + 1, to)])]
     Move(usize, usize),
     #[variant((Picks[@picks]) -> Command[picks.need])]
     Remove(Picks),
