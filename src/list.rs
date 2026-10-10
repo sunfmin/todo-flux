@@ -702,13 +702,19 @@ impl TodoList {
         index + 1
     }
 
+    /// The todos as a slice whose length is the list's, so that walking it
+    /// with `enumerate` yields indices proved to be in the list.
+    #[spec(fn(&TodoList[@n]) -> &[Todo][n])]
+    fn todos(&self) -> &[Todo] {
+        &self.items
+    }
+
     /// The todo to work on next: the first one not done among those of the
     /// most urgent priority that has any, or `None` when everything is done.
     #[spec(fn(&TodoList[@n]) -> Option<usize{i: i < n}>)]
     pub fn next(&self) -> Option<usize> {
         let mut most_urgent: Option<Priority> = None;
-        for i in 0..self.len() {
-            let todo = &self[i];
+        for todo in self.todos().iter() {
             if !todo.status.is_done() {
                 most_urgent = Some(match most_urgent {
                     Some(priority) => min(priority, todo.priority),
@@ -717,8 +723,7 @@ impl TodoList {
             }
         }
         let wanted = most_urgent?;
-        for i in 0..self.len() {
-            let todo = &self[i];
+        for (i, todo) in self.todos().iter().enumerate() {
             if !todo.status.is_done() && todo.priority == wanted {
                 return Some(i);
             }

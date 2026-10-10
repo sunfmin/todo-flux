@@ -187,3 +187,10 @@ fn removal_claimed_to_keep_the_list_whole(list: &mut TodoList, picks: &Picks) {
 fn smaller_of_a_priority_and_any_number_claimed_a_priority(priority: Priority, n: u8) -> Priority {
     std::cmp::min(priority, n)
 }
+
+#[should_fail]
+fn index_from_walking_one_slice_used_on_another(walked: &[Todo], other: &[Todo]) {
+    for (index, _) in walked.iter().enumerate() {
+        let _ = &other[index];
+    }
+}
