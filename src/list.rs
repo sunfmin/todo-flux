@@ -35,11 +35,13 @@ impl Status {
 
     /// Whether a todo in this status may move to `to`.
     #[spec(fn(&Status[@from], to: Status) -> bool[can_become(from, to)])]
+    #[no_panic]
     pub fn can_become(&self, to: Status) -> bool {
         !matches!((self, to), (Status::Done, Status::Doing))
     }
 
     #[spec(fn(&Status[@s]) -> bool[s == Status::Done])]
+    #[no_panic]
     pub fn is_done(&self) -> bool {
         matches!(self, Status::Done)
     }
@@ -49,6 +51,7 @@ impl Status {
         Status::ALL.into_iter().find(|status| status.name() == name)
     }
 
+    #[no_panic]
     pub fn name(&self) -> &'static str {
         match self {
             Status::Open => "open",
@@ -58,6 +61,7 @@ impl Status {
     }
 
     /// How the status starts a line of the text format.
+    #[no_panic]
     fn mark(&self) -> &'static str {
         match self {
             Status::Open => "[ ] ",
@@ -77,6 +81,7 @@ pub type Priority = u8;
 // Flux reasons about the comparisons; it has no spec for `RangeInclusive::contains`.
 #[allow(clippy::manual_range_contains)]
 #[spec(fn(n: u8) -> Option<u8[n]>[is_priority(n)])]
+#[no_panic]
 pub fn priority(n: u8) -> Option<Priority> {
     if HIGHEST_PRIORITY <= n && n <= LOWEST_PRIORITY {
         Some(n)
@@ -126,6 +131,7 @@ impl Title {
 
 /// Where a priority's count sits in the array `open_by_priority` returns.
 #[spec(fn(p: Priority) -> usize{slot: slot < PRIORITY_LEVELS})]
+#[no_panic]
 pub fn slot(priority: Priority) -> usize {
     (priority - HIGHEST_PRIORITY) as usize
 }
@@ -175,6 +181,7 @@ impl Todo {
     /// when `can_become` holds and otherwise leaves the status alone.
     #[spec(fn(self: &mut Todo[@t], to: Status) -> bool[can_become(t.status, to)]
            ensures self: Todo{v: v.status == if can_become(t.status, to) { to } else { t.status }})]
+    #[no_panic]
     pub fn try_become(&mut self, to: Status) -> bool {
         let allowed = self.status.can_become(to);
         if allowed {
@@ -230,6 +237,7 @@ pub struct Progress {
 
 impl Progress {
     #[spec(fn(&Progress[@p]) -> usize[p.total - p.done])]
+    #[no_panic]
     pub fn left(&self) -> usize {
         self.total - self.done
     }
@@ -237,6 +245,7 @@ impl Progress {
     /// The done share as a whole percentage. There is no share of nothing,
     /// so the caller must have at least one todo.
     #[spec(fn(&Progress[@p]) -> usize{v: v <= 100} requires p.total > 0)]
+    #[no_panic]
     pub fn percent(&self) -> usize {
         // In u128 the product cannot overflow, however long the list is.
         (self.done as u128 * 100 / self.total as u128) as usize
@@ -252,6 +261,7 @@ pub struct TodoList {
 
 impl TodoList {
     #[spec(fn() -> TodoList[0])]
+    #[no_panic]
     pub fn new() -> TodoList {
         TodoList { items: Vec::new() }
     }
@@ -291,6 +301,7 @@ impl TodoList {
     }
 
     #[spec(fn(&TodoList[@n]) -> usize[n])]
+    #[no_panic]
     pub fn len(&self) -> usize {
         self.items.len()
     }
@@ -308,6 +319,7 @@ impl TodoList {
     /// Turns the 1-based position a user types into its index: `Some` exactly
     /// when a todo sits at that position, and then the index just before it.
     #[spec(fn(&TodoList[@n], pos: usize) -> Option<usize[pos - 1]>[is_position(pos, n)])]
+    #[no_panic]
     pub fn locate(&self, pos: usize) -> Option<usize> {
         if 1 <= pos && pos <= self.len() {
             Some(pos - 1)
