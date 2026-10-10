@@ -13,6 +13,7 @@ flux-alloc = { git = "https://github.com/flux-rs/flux.git", rev = "b2f3e31e17727
 # `cargo flux` verifies the refinement types in this crate.
 [package.metadata.flux]
 enabled = true
+check_overflow = "strict"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(flux)'] }

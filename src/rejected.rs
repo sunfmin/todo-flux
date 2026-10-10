@@ -86,3 +86,8 @@ where
 fn title_with_nothing_on_it(title: &Title) -> usize {
     title.chars()
 }
+
+#[should_fail]
+fn percent_multiplied_in_usize(progress: &Progress) -> usize {
+    progress.done * 100
+}
