@@ -11,7 +11,10 @@ mod rejected;
 use std::{env, fs, io, path::PathBuf, process::ExitCode};
 
 use flux_rs::attrs::*;
-use list::{HIGHEST_PRIORITY, LOWEST_PRIORITY, Priority, Status, Title, TodoList, priority, slot};
+use list::{
+    HIGHEST_PRIORITY, LOWEST_PRIORITY, Priority, Status, Title, TodoList, priorities, priority,
+    slot,
+};
 
 const USAGE: &str = "\
 usage: todo [list]          show all todos
@@ -194,9 +197,7 @@ fn print_list(list: &TodoList, only: Option<Status>) {
         progress.left()
     );
     let open = list.open_by_priority();
-    for n in HIGHEST_PRIORITY..=LOWEST_PRIORITY {
-        if let Some(priority) = priority(n) {
-            println!("  {} open at !{priority}", open[slot(priority)]);
-        }
+    for priority in priorities() {
+        println!("  {} open at !{priority}", open[slot(priority)]);
     }
 }

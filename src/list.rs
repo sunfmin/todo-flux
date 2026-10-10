@@ -152,6 +152,16 @@ impl Title {
     }
 }
 
+/// Every priority, most urgent first. Whatever the iterator is made of, each
+/// item it yields is a proved priority.
+#[spec(fn() -> impl Iterator<Item = Priority>)]
+pub fn priorities() -> impl Iterator<Item = Priority> {
+    // The length ties this list to the range: change one and not the other
+    // and it stops compiling.
+    let all: [Priority; PRIORITY_LEVELS] = [1, 2, 3];
+    all.into_iter()
+}
+
 /// Theorems about the status rules, proved once for every status rather than
 /// tested for some. Only Flux compiles them.
 #[cfg(flux)]
