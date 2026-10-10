@@ -6,7 +6,12 @@
 
 use std::{collections::BTreeSet, ops::Index};
 
-use flux_rs::{attrs::*, bitvec::BV32, defs, macros::invariant};
+use flux_rs::{
+    attrs::*,
+    bitvec::BV32,
+    defs,
+    macros::{invariant, qualifier},
+};
 
 const PRIORITY_TAG: char = '!';
 
@@ -746,13 +751,17 @@ impl TodoList {
     }
 
     /// Takes the picked todos out of the list and returns them in the order
-    /// they had. Walking from the end keeps every index still to visit valid
+    /// they had. The list shrinks by exactly as many todos as come back:
+    /// none is lost and none is taken twice. Walking from the end keeps every index still to visit valid
     /// while the list shrinks under it.
-    #[spec(fn(self: &mut TodoList[@n], &Picks{p: p.need <= n}) -> Vec<Todo> ensures self: TodoList{v: v.len <= n})]
+    #[spec(fn(self: &mut TodoList[@n], &Picks{p: p.need <= n}) -> Vec<Todo>[#taken] ensures self: TodoList[n - taken])]
     pub fn remove_all(&mut self, picks: &Picks) -> Vec<Todo> {
         let mut removed = Vec::new();
         let mut index = self.len();
         while index > 0 {
+            // What stays true on every turn, which Flux does not find alone:
+            // the todos left and the todos taken add up to the original list.
+            qualifier!(left: int, taken: int, all: int; left + taken == all);
             index -= 1;
             if picks.contains(index) {
                 removed.push(self.items.remove(index));

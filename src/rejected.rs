@@ -175,3 +175,9 @@ fn priority_change_that_also_reopens_the_todo(todo: &mut Todo, priority: Priorit
 fn every_command_claimed_to_need_a_todo(_command: &Command) -> bool {
     true
 }
+
+#[should_fail]
+#[spec(fn(list: &mut TodoList[@n], &Picks{p: p.need <= n}) ensures list: TodoList[n])]
+fn removal_claimed_to_keep_the_list_whole(list: &mut TodoList, picks: &Picks) {
+    list.remove_all(picks);
+}
