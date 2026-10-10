@@ -267,13 +267,13 @@ fn hand_edited_file_loads() {
     let cli = Cli::new("hand-edited");
     fs::write(
         &cli.file,
-        "no mark\n\n[x] finished\n[ ] !1 urgent\n[x] !9 bad priority\n!3 low\n[ ] !2  \n[~]   padded  \n",
+        "no mark\n\n[x] finished\n[ ] !1 urgent\n[x] !9 bad priority\n!3 low\n[ ] !2  \n[~]   padded  \n[ ] !02 two digits\n",
     )
     .unwrap();
     cli.ok(&["mv", "1", "1"]);
     assert_eq!(
         cli.stored(),
-        "[ ] !2 no mark\n[x] !2 finished\n[ ] !1 urgent\n[x] !2 !9 bad priority\n[ ] !3 low\n[~] !2 padded\n"
+        "[ ] !2 no mark\n[x] !2 finished\n[ ] !1 urgent\n[x] !2 !9 bad priority\n[ ] !3 low\n[~] !2 padded\n[ ] !2 !02 two digits\n"
     );
 }
 
