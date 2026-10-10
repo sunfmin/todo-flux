@@ -28,6 +28,13 @@ defs! {
     fn mark_of(status: Status) -> str {
         if status == Status::Open { "[ ] " } else if status == Status::Doing { "[~] " } else { "[x] " }
     }
+    // Every slot of an array with one slot per priority belongs to a
+    // priority: the number of slots and the range of priorities agree.
+    // Flux wants the bound written as a number; the theorem that uses this
+    // also checks that number against `PRIORITY_LEVELS`.
+    fn every_slot_has_a_priority() -> bool {
+        forall slot in 0 .. 3 { is_priority(slot + HIGHEST_PRIORITY) }
+    }
     // The number a digit character stands for. `cast` turns the character
     // into its code so the spec can do arithmetic on it.
     fn digit_value(c: char) -> int { cast(c) - cast('0') }
@@ -324,13 +331,21 @@ mod status_theorems {
     use flux_rs::{attrs::*, defs};
 
     // The specs name the variants; Rust itself sees no use of the type.
+    use super::PRIORITY_LEVELS;
     #[allow(unused_imports)]
     use super::Status;
 
     defs! {
         use super::can_become;
         use super::mark_of;
+        use super::every_slot_has_a_priority;
     }
+
+    /// `PRIORITY_LEVELS` slots are exactly enough: none is left without a
+    /// priority to count.
+    #[trusted(reason = "a statement, not code: whoever calls it must prove it")]
+    #[spec(fn(usize[@levels]) requires levels == 3 && every_slot_has_a_priority())]
+    fn no_priority_slot_is_spare(_levels: usize) {}
 
     /// Whatever its status, a todo can always be reopened and always be
     /// finished: no status is a dead end.
@@ -351,6 +366,7 @@ mod status_theorems {
     fn proofs() {
         no_status_is_a_dead_end();
         marks_tell_statuses_apart();
+        no_priority_slot_is_spare(PRIORITY_LEVELS);
     }
 }
 
