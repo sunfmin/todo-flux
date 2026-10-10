@@ -96,7 +96,7 @@ fn run(args: &[String]) -> Result<(), String> {
 }
 
 /// Reads the arguments as a command that `list` is long enough for.
-#[spec(fn(&TodoList[@n], &[String]) -> Result<Command{c: c.need <= n}, String>)]
+#[spec(fn(&TodoList[@n], _) -> Result<Command{c: c.need <= n}, _>)]
 fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
     let (name, rest) = match args.split_first() {
         Some((name, rest)) => (name.as_str(), rest),
@@ -146,7 +146,7 @@ fn load(path: &PathBuf) -> Result<TodoList, String> {
 }
 
 /// Turns the 1-based todo number a user typed into a proved-valid index.
-#[spec(fn(&TodoList[@n], &str) -> Result<usize{i: i < n}, String>)]
+#[spec(fn(&TodoList[@n], _) -> Result<usize{i: i < n}, _>)]
 fn index_of(list: &TodoList, arg: &str) -> Result<usize, String> {
     let Ok(pos) = arg.parse() else {
         return Err(format!("'{arg}' is not a todo number"));
@@ -157,7 +157,7 @@ fn index_of(list: &TodoList, arg: &str) -> Result<usize, String> {
     }
 }
 
-#[spec(fn(&str) -> Result<Priority, String>)]
+#[spec(fn(_) -> Result<Priority, _>)]
 fn priority_of(arg: &str) -> Result<Priority, String> {
     if let Ok(n) = arg.parse()
         && let Some(priority) = priority(n)

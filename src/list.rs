@@ -239,7 +239,7 @@ impl Todo {
 
 /// Splits `!2 title` into its priority and title. Text without a valid
 /// priority tag is all title.
-#[spec(fn(&str) -> (Priority, &str))]
+#[spec(fn(_) -> (Priority, _))]
 fn split_priority(rest: &str) -> (Priority, &str) {
     if let Some((tag, title)) = rest.split_once(' ')
         && let Some(digits) = tag.strip_prefix(PRIORITY_TAG)
