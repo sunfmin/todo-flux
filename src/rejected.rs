@@ -248,3 +248,11 @@ fn todo_chosen_from_one_list_read_from_another(
         let _ = &other[index];
     }
 }
+
+// True by the rule as it is written, but the rule is hidden: without
+// `reveal`, Flux knows that it is a rule and not what it says.
+#[should_fail]
+#[spec(fn() -> bool[can_become(Status::Open, Status::Done)])]
+fn hidden_rule_read_without_revealing_it() -> bool {
+    true
+}
