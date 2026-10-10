@@ -988,18 +988,31 @@ impl TodoList {
 /// all Flux has to go on at the call, and it is enough to index the list
 /// with the answer. Every implementation is checked against that spec.
 pub trait Choice {
-    #[spec(fn(&Self, &TodoList[@n]) -> Option<usize{i: i < n}>)]
     fn of(&self, list: &TodoList) -> Option<usize>;
 
     /// What to tell the user when no todo is chosen.
     fn none(&self) -> &'static str;
 }
 
+// The one promise every choice makes, said for the trait and for each way
+// of choosing in one place, detached from the code it is about.
+#[specs {
+    trait Choice {
+        fn of(&Self, list: &TodoList[@n]) -> Option<usize{i: i < n}>;
+    }
+    impl Choice for MostUrgent {
+        fn of(&Self, list: &TodoList[@n]) -> Option<usize{i: i < n}>;
+    }
+    impl Choice for InProgress {
+        fn of(&Self, list: &TodoList[@n]) -> Option<usize{i: i < n}>;
+    }
+}]
+const _: () = ();
+
 /// The todo `TodoList::next` names.
 pub struct MostUrgent;
 
 impl Choice for MostUrgent {
-    #[spec(fn(&Self, &TodoList[@n]) -> Option<usize{i: i < n}>)]
     fn of(&self, list: &TodoList) -> Option<usize> {
         list.next()
     }
@@ -1013,7 +1026,6 @@ impl Choice for MostUrgent {
 pub struct InProgress;
 
 impl Choice for InProgress {
-    #[spec(fn(&Self, &TodoList[@n]) -> Option<usize{i: i < n}>)]
     fn of(&self, list: &TodoList) -> Option<usize> {
         list.first_doing()
     }
