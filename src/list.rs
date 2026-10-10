@@ -4,7 +4,7 @@
 //! indexing, `set_status` or `move_to` is proved in bounds at compile time. The
 //! only way to obtain such an index from untrusted input is `locate`.
 
-use std::{collections::BTreeSet, ops::Index};
+use std::{cmp::min, collections::BTreeSet, ops::Index};
 
 use flux_rs::{
     attrs::*,
@@ -308,13 +308,17 @@ mod status_set_theorems {
     }
 }
 
-/// The smaller of two numbers. It is generic in what is known about them:
-/// whatever property `p` both have, the result has too, so the smaller of
-/// two priorities is a priority and nothing here mentions priorities.
-#[no_panic]
-#[spec(fn[hrn p: int -> bool](a: u8{p(a)}, b: u8{p(b)}) -> u8{v: p(v) && v <= a && v <= b})]
-fn smaller(a: u8, b: u8) -> u8 {
-    if a < b { a } else { b }
+/// What std's `min` keeps. The spec is generic in what is known about the
+/// two values: whatever property `p` both have, the result has too, so the
+/// smaller of two priorities is a priority and nothing here mentions
+/// priorities. Only Flux reads this.
+#[cfg(flux)]
+mod cmp_specs {
+    use flux_rs::attrs::*;
+
+    #[extern_spec(std::cmp)]
+    #[spec(fn[hrn p: T -> bool](T{v: p(v)}, T{v: p(v)}) -> T{v: p(v)})]
+    fn min<T: Ord>(a: T, b: T) -> T;
 }
 
 /// Every priority, most urgent first. Whatever the iterator is made of, each
@@ -707,7 +711,7 @@ impl TodoList {
             let todo = &self[i];
             if !todo.status.is_done() {
                 most_urgent = Some(match most_urgent {
-                    Some(priority) => smaller(priority, todo.priority),
+                    Some(priority) => min(priority, todo.priority),
                     None => todo.priority,
                 });
             }

@@ -181,3 +181,9 @@ fn every_command_claimed_to_need_a_todo(_command: &Command) -> bool {
 fn removal_claimed_to_keep_the_list_whole(list: &mut TodoList, picks: &Picks) {
     list.remove_all(picks);
 }
+
+#[should_fail]
+#[spec(fn(Priority, u8) -> Priority)]
+fn smaller_of_a_priority_and_any_number_claimed_a_priority(priority: Priority, n: u8) -> Priority {
+    std::cmp::min(priority, n)
+}
