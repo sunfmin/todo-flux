@@ -65,13 +65,13 @@ defs! {
 #[refined_by(need: int)]
 #[invariant(need >= 0)]
 enum Command {
-    #[variant((StatusSet) -> Command[0])]
+    #[variant((_) -> Command[0])]
     List(StatusSet),
     #[variant(Command[0])]
     Help,
     #[variant(Command[0])]
     Next,
-    #[variant((Title) -> Command[0])]
+    #[variant((_) -> Command[0])]
     Add(Title),
     #[variant((usize[@index], Status) -> Command[index + 1])]
     SetStatus(usize, Status),

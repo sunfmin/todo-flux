@@ -9,11 +9,6 @@ use std::{cmp::min, collections::BTreeSet, ops::Index};
 use flux_rs::{attrs::*, bitvec::BV32, defs, macros::qualifier};
 
 use crate::rvec::RVec;
-// Only the specs name the allocator, and only Flux reads them; Rust itself
-// sees no use of it.
-#[cfg(flux)]
-#[allow(unused_imports)]
-use std::alloc::Global;
 
 const PRIORITY_TAG: char = '!';
 
@@ -539,7 +534,9 @@ fn split_priority(rest: &str) -> (Priority, &str) {
 #[refined_by(picked: Set<int>, need: int)]
 #[invariant(need >= 0)]
 pub struct Picks {
-    #[field(BTreeSet<usize, Global>[picked])]
+    // The holes leave the element and allocator types to Rust: the spec is
+    // only about which indices are in the set.
+    #[field(BTreeSet<_, _>[picked])]
     set: BTreeSet<usize>,
     // One past the largest index picked. In u128 that cannot overflow,
     // whatever the index.
