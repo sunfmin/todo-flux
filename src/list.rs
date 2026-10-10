@@ -6,12 +6,7 @@
 
 use std::{cmp::min, collections::BTreeSet, ops::Index};
 
-use flux_rs::{
-    attrs::*,
-    bitvec::BV32,
-    defs,
-    macros::{invariant, qualifier},
-};
+use flux_rs::{attrs::*, bitvec::BV32, defs, macros::qualifier};
 
 const PRIORITY_TAG: char = '!';
 
@@ -717,7 +712,6 @@ impl TodoList {
         let total = self.len();
         let mut done = 0;
         for i in 0..total {
-            invariant!(done: int; done <= i);
             if self[i].status.is_done() {
                 done += 1;
             }
