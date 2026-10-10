@@ -132,7 +132,12 @@ fn list_can_show_one_status_under_the_original_numbers() {
         cli.ok(&["list", "done"]),
         format!(" 3. [x] !2 c\n{summary}")
     );
+    assert_eq!(
+        cli.ok(&["list", "done", "open", "open"]),
+        format!(" 1. [ ] !2 a\n 3. [x] !2 c\n{summary}")
+    );
     assert!(!cli.run(&["list", "later"]).status.success());
+    assert!(!cli.run(&["list", "open", "later"]).status.success());
 }
 
 #[test]
