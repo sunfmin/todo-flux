@@ -136,6 +136,34 @@ impl Title {
     }
 }
 
+/// Theorems about the status rules, proved once for every status rather than
+/// tested for some. Only Flux compiles them.
+#[cfg(flux)]
+mod status_theorems {
+    #![allow(dead_code)]
+
+    use flux_rs::{attrs::*, defs};
+
+    // The specs name the variants; Rust itself sees no use of the type.
+    #[allow(unused_imports)]
+    use super::Status;
+
+    defs! {
+        use super::can_become;
+    }
+
+    /// Whatever its status, a todo can always be reopened and always be
+    /// finished: no status is a dead end.
+    #[trusted(reason = "a statement, not code: whoever calls it must prove it")]
+    #[spec(fn() requires forall s. can_become(s, Status::Open) && can_become(s, Status::Done))]
+    fn no_status_is_a_dead_end() {}
+
+    #[reveal(can_become)]
+    fn proofs() {
+        no_status_is_a_dead_end();
+    }
+}
+
 /// Where a priority's count sits in the array `open_by_priority` returns.
 #[spec(fn(p: Priority) -> usize{slot: slot < PRIORITY_LEVELS})]
 #[no_panic]
