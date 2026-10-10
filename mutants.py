@@ -59,6 +59,7 @@ MUTANTS = [
     ("Ignored and trusted code: Derive-generated code", "src/list.rs", '#[trusted_derive(reason = "Flux cannot check the discriminant comparison derive writes")]\n', ""),
     ("Pragma: `should_fail`", "src/rejected.rs", "#[should_fail]\n", ""),
     ("Const Generics: Refining Array Lengths", "src/list.rs", "let mut counts = [0; N];", "let mut counts = [0; 2];"),
+    ("Const Generics: Refining Struct Fields", "src/list.rs", "#[field({usize[part] | part <= OUT_OF})]", "#[field({usize[part] | part < OUT_OF})]"),
     ("Const Generics: Refining Function Signatures", "src/list.rs", "slot_of: fn(&Todo) -> Option<usize{slot: slot < N}>", "slot_of: fn(&Todo) -> Option<usize{slot: slot < N + 1}>"),
     ("Type Aliases", "src/list.rs", "#[alias(type Priority = u8{p: is_priority(p)})]", "#[alias(type Priority = u8{p: p <= LOWEST_PRIORITY})]"),
     ("Spec Function Definitions: Plain Expressions", "src/list.rs", "{ 1 <= pos && pos <= len }", "{ 0 <= pos && pos <= len }"),
@@ -125,7 +126,6 @@ NOT_REFLECTED = {
     "Type Aliases: Note": "a remark",
     "Spec Function Definitions: No Cycles!": "a restriction: what Flux refuses, with nothing to use",
     "Generic Refinements: Hindley Refinements": "the guide says TODO and shows nothing",
-    "Const Generics: Refining Struct Fields": "no struct here has a const parameter; the arrays `tally` builds carry N themselves",
 }
 
 

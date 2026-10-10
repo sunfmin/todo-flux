@@ -358,7 +358,7 @@ fn print_list(out: &mut dyn Write, list: &TodoList, only: StatusSet) -> io::Resu
         out,
         "{}/{total} done ({}%), {} left, {} doing",
         progress.done,
-        progress.percent(),
+        progress.percent().part,
         progress.left(),
         list.by_status()[Status::Doing.slot()]
     )?;

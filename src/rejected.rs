@@ -63,7 +63,7 @@ fn done_mistaken_for_length(list: &TodoList) -> usize {
 
 #[should_fail]
 fn percent_of_empty_list() -> usize {
-    TodoList::new().progress().percent()
+    TodoList::new().progress().percent().part
 }
 
 #[should_fail]
@@ -263,4 +263,9 @@ fn hidden_rule_read_without_revealing_it() -> bool {
 #[should_fail]
 fn run_of_todos_built_backwards() -> crate::Numbers {
     crate::Numbers::Run(3, 2)
+}
+
+#[should_fail]
+fn share_larger_than_the_whole() -> crate::list::Share<10> {
+    crate::list::Share { part: 11 }
 }

@@ -37,7 +37,7 @@ a runtime panic or a silently wrong file.
 | Reflected enums, structs indexed by them | A status changes only as the rules allow: a done todo must be reopened before it is started again | `Status`, `Todo::try_become` |
 | Record update syntax in specs | Changing a todo's status leaves its priority alone, and the other way round | `Todo::try_become`, `Todo::set_priority` |
 | Enums with refined variants, enum invariants | A parsed command fits the list it was parsed against, so running it needs no checks | `Command`, `parse` |
-| Refined arrays, const generics, refined function pointers | One counting loop serves any number of slots, and every todo lands in a slot that exists | `TodoList::tally` |
+| Refined arrays, const generics, refined function pointers | One counting loop serves any number of slots, and every todo lands in a slot that exists; a share is never more than the whole its type names | `TodoList::tally`, `Share` |
 | Refined closure signatures | The loop that hands indexes to a closure only hands out valid ones | `TodoList::each_index` |
 | `for` loops over ranges | Loop variables stay in range, with nothing written by hand | `TodoList::progress` |
 | `invariant!` | Counting the digits of the largest todo number cannot overflow | `number_width` |
@@ -90,17 +90,15 @@ each has a use in the code, and a proof that rests on that use.
 `mutants.py` is the check. It first reads the guide itself, at the Flux
 revision `Cargo.toml` pins, and requires every heading and named sub-item
 in it to have a mutant, or to be listed in `NOT_REFLECTED` with the reason:
-98 sections, 8 of them not reflected (three example programs, a remark, a
-restriction, a part the guide leaves as TODO, and two forms the code has no
-place for: a detached spec of an enum and a const parameter in a struct
-field). Then for every section it breaks the one line that uses the
+98 sections, 6 of them with nothing to reflect (three example programs, a
+remark, a restriction, and a part the guide leaves as TODO). Then for every section it breaks the one line that uses the
 capability, runs Flux, and expects the program to be rejected. A
 line that can be broken without Flux noticing is doing no work, and a line
 that is gone is reported too, so a refactor cannot quietly drop a
 capability.
 
 ```
-uv run mutants.py             # the sections, then all 84 mutants: about six minutes
+uv run mutants.py             # the sections, then all 86 mutants: about six minutes
 uv run mutants.py Sets        # only the sections whose name contains "Sets"
 uv run mutants.py --sections  # only the comparison with the guide, one second
 ```

@@ -755,12 +755,27 @@ impl Progress {
 
     /// The done share as a whole percentage. There is no share of nothing,
     /// so the caller must have at least one todo.
-    #[spec(fn(&Progress[@p]) -> usize{v: v <= 100} requires p.total > 0)]
+    #[spec(fn(&Progress[@p]) -> Percent requires p.total > 0)]
     #[no_panic]
-    pub fn percent(&self) -> usize {
+    pub fn percent(&self) -> Percent {
         // In u128 the product cannot overflow, however long the list is.
-        (self.done as u128 * 100 / self.total as u128) as usize
+        Share {
+            part: (self.done as u128 * 100 / self.total as u128) as usize,
+        }
     }
+}
+
+pub type Percent = Share<100>;
+
+/// A part of a whole that is counted in `OUT_OF` pieces, and never more
+/// than all of them: a percentage is a `Share<100>`. The bound is the
+/// type's own parameter, so it is written once, where the share is named.
+/// A whole has at least one piece.
+#[refined_by(part: int)]
+#[invariant(OUT_OF > 0)]
+pub struct Share<const OUT_OF: usize> {
+    #[field({usize[part] | part <= OUT_OF})]
+    pub part: usize,
 }
 
 /// The todos a removal took out, in the order they had. The alias carries
