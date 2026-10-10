@@ -10,7 +10,7 @@ use flux_rs::{attrs::*, defs};
 
 use crate::{
     Command,
-    list::{Picks, Progress, Status, StatusSet, Title, Todo, TodoList},
+    list::{Picks, Priority, Progress, Status, StatusSet, Title, Todo, TodoList},
 };
 
 defs! {
@@ -161,4 +161,11 @@ fn any_text_claimed_to_make_a_title(text: &str) -> bool {
 #[spec(fn(&str, &str) -> bool[true])]
 fn two_texts_claimed_to_be_blank_together(a: &str, b: &str) -> bool {
     Title::new(a).is_some() == Title::new(b).is_some()
+}
+
+#[should_fail]
+#[spec(fn(todo: &mut Todo[@t], Priority[@priority]) ensures todo: Todo[Todo { priority: priority, ..t }])]
+fn priority_change_that_also_reopens_the_todo(todo: &mut Todo, priority: Priority) {
+    todo.priority = priority;
+    todo.status = Status::Open;
 }
