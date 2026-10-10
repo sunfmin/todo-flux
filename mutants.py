@@ -103,6 +103,7 @@ MUTANTS = [
     ("Casting Sorts", "src/list.rs", "cast(c) - cast('0')", "cast(c) - cast('1')"),
     ("Detached Specifications: Function Types", "src/main.rs", "-> Result<Vec<usize{i: i < n}>, String>;", "-> Result<Vec<usize{i: i <= n}>, String>;"),
     ("Detached Specifications: Structs", "src/list.rs", "        bits: {BV32[bits] | only_status_bits(bits)},", "        bits: BV32,"),
+    ("Detached Specifications: Enums", "src/main.rs", "{usize[@last] | first <= last}) -> Numbers[last + 1]", "usize[@last]) -> Numbers[last + 1]"),
     ("Detached Specifications: Traits", "src/list.rs", "    trait Choice {\n        fn of(&Self, list: &TodoList[@n]) -> Option<usize{i: i < n}>;", "    trait Choice {\n        fn of(&Self, list: &TodoList[@n]) -> Option<usize>;"),
     ("Detached Specifications: Inherent Impls", "src/list.rs", "-> bool[bits & bit_of(status) != 0];", "-> bool[bits & bit_of(status) == 0];"),
     ("Detached Specifications: Trait Impls", "src/list.rs", "-> bool[a == b];", "-> bool[a != b];"),
@@ -124,7 +125,6 @@ NOT_REFLECTED = {
     "Type Aliases: Note": "a remark",
     "Spec Function Definitions: No Cycles!": "a restriction: what Flux refuses, with nothing to use",
     "Generic Refinements: Hindley Refinements": "the guide says TODO and shows nothing",
-    "Detached Specifications: Enums": "the one refined enum, Command, shows the attribute form; an enum takes one form or the other",
     "Const Generics: Refining Struct Fields": "no struct here has a const parameter; the arrays `tally` builds carry N themselves",
 }
 

@@ -59,9 +59,14 @@ defs! {
     use crate::list::need_with;
 }
 
-// What the arguments of `rm` are read into, said here and not on the
-// function: a detached spec, the same promise from outside the code.
+// What the arguments of `rm` are read into, said here and not on the enum
+// and the function: detached specs, the same promises from outside the code.
 #[specs {
+    #[refined_by(need: int)]
+    enum Numbers {
+        One(usize[@index]) -> Numbers[index + 1],
+        Run(usize[@first], {usize[@last] | first <= last}) -> Numbers[last + 1],
+    }
     fn indexes_of(list: &TodoList[@n], arg: &str) -> Result<Vec<usize{i: i < n}>, String>;
 }]
 const _: () = ();
@@ -238,16 +243,36 @@ fn index_of(list: &TodoList, arg: &str) -> Result<usize, String> {
 /// The indexes an argument of `rm` names: one todo number, or a range of
 /// them written `2-4`.
 fn indexes_of(list: &TodoList, arg: &str) -> Result<Vec<usize>, String> {
-    let (first, last) = match arg.split_once('-') {
-        Some((first, last)) if !first.is_empty() => (first, last),
-        _ => (arg, arg),
+    let numbers = match arg.split_once('-') {
+        Some((first, last)) if !first.is_empty() => {
+            let first = index_of(list, first)?;
+            let last = index_of(list, last)?;
+            if first > last {
+                return Err(format!("the range {arg} runs backwards"));
+            }
+            Numbers::Run(first, last)
+        }
+        _ => Numbers::One(index_of(list, arg)?),
     };
-    let first = index_of(list, first)?;
-    let last = index_of(list, last)?;
-    if first > last {
-        return Err(format!("the range {arg} runs backwards"));
+    Ok(numbers.indexes())
+}
+
+/// What one argument of `rm` names: one todo, or a run of them from a first
+/// to a last. A run that ends before it starts cannot be built, and `need`
+/// is the shortest list all the todos named are in.
+enum Numbers {
+    One(usize),
+    Run(usize, usize),
+}
+
+impl Numbers {
+    #[spec(fn(Numbers[@need]) -> Vec<usize{i: i < need}>)]
+    fn indexes(self) -> Vec<usize> {
+        match self {
+            Numbers::One(index) => span(index, index),
+            Numbers::Run(first, last) => span(first, last),
+        }
     }
-    Ok(span(first, last))
 }
 
 /// The indexes from `first` to `last`, both included: every one between

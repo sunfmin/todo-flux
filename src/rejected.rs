@@ -259,3 +259,8 @@ fn todo_chosen_from_one_list_read_from_another(
 fn hidden_rule_read_without_revealing_it() -> bool {
     true
 }
+
+#[should_fail]
+fn run_of_todos_built_backwards() -> crate::Numbers {
+    crate::Numbers::Run(3, 2)
+}

@@ -60,7 +60,7 @@ a runtime panic or a silently wrong file.
 | Extern specs: a struct and its methods, a free function, a primitive type, a trait | What `BTreeSet`, `std::cmp::max`, `char::to_digit` and `Default` promise; a todo starts open | `set_specs`, `cmp_specs`, `char_specs`, `default_specs` |
 | Include patterns | The refined vector's file is the trusted base, named once | `Cargo.toml` (`include_trusted`) |
 | A refined vector (`RVec`) | Reading a todo at a proved index cannot panic | `src/rvec.rs` |
-| Detached specs, `trusted_derive` | Specs stated beside the code and not on it: for a derived `==` (trait impl), a function, a struct and its impl, a trait | `Status`, `indexes_of`, `StatusSet`, `Choice` |
+| Detached specs, `trusted_derive` | Specs stated beside the code and not on it: for a derived `==` (trait impl), a function, an enum, a struct and its impl, a trait | `Status`, `indexes_of`, `Numbers`, `StatusSet`, `Choice` |
 | Opaque structs, trusted functions | A title is never blank | `Title`, `RVec` |
 | Type holes (`_`) in signatures, fields, variants and aliases | A spec names only the part it is about | `split_priority`, `parse`, `Picks`, `Command`, `Removed` |
 | Refined `impl Trait` | Every priority an iterator yields is a priority | `priorities` |
