@@ -162,6 +162,30 @@ impl Status {
     }
 }
 
+/// What std's `Default` promises, which by itself is nothing: the spec gives
+/// the trait an associated refinement, `is_default`, that an implementation
+/// may define to say what its default is. Only Flux reads this.
+#[cfg(flux)]
+mod default_specs {
+    use flux_rs::attrs::*;
+
+    #[extern_spec(std::default)]
+    #[assoc(fn is_default(value: Self) -> bool { true })]
+    trait Default {
+        #[spec(fn() -> Self{value: <Self as Default>::is_default(value)})]
+        fn default() -> Self;
+    }
+}
+
+/// A todo starts open: on `add`, and when a line in the file has no mark.
+#[assoc(fn is_default(status: Status) -> bool { status == Status::Open })]
+impl Default for Status {
+    #[spec(fn() -> Status[Status::Open])]
+    fn default() -> Status {
+        Status::Open
+    }
+}
+
 /// How urgent a todo is. Flux only lets a value in the valid range have this
 /// type, so the only way to make one from an arbitrary number is `priority`.
 #[alias(type Priority = u8{p: is_priority(p)})]
@@ -391,6 +415,13 @@ mod status_theorems {
         && (mark_of(s) == mark_of(Status::Done) => s == Status::Done))]
     fn marks_tell_statuses_apart() {}
 
+    /// The status a todo starts in is open, known from the spec of the
+    /// `Default` trait alone.
+    #[spec(fn() -> Status{s: s == Status::Open})]
+    fn a_new_todo_is_open() -> Status {
+        Status::default()
+    }
+
     #[reveal(can_become)]
     fn proofs() {
         no_status_is_a_dead_end();
@@ -432,7 +463,7 @@ impl Todo {
     /// priority means the default, so any hand-edited file still loads. A
     /// line with no title on it is not a todo.
     fn from_line(line: &str) -> Option<Todo> {
-        let mut status = Status::Open;
+        let mut status = Status::default();
         let mut rest = line;
         for candidate in Status::ALL {
             if let Some(after_mark) = line.strip_prefix(candidate.mark()) {
@@ -740,7 +771,7 @@ impl TodoList {
     pub fn add(&mut self, title: Title) {
         self.push(Todo {
             title,
-            status: Status::Open,
+            status: Status::default(),
             priority: DEFAULT_PRIORITY,
         });
     }

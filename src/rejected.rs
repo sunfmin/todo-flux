@@ -225,3 +225,15 @@ fn any_number_claimed_new_to_a_std_set(
 ) -> bool {
     set.insert(n)
 }
+
+#[should_fail]
+#[spec(fn() -> Status[Status::Done])]
+fn a_new_todo_claimed_to_start_done() -> Status {
+    Status::default()
+}
+
+#[should_fail]
+#[spec(fn() -> T{value: false})]
+fn every_default_claimed_impossible<T: Default>() -> T {
+    T::default()
+}
