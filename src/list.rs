@@ -45,6 +45,11 @@ defs! {
     // The number a digit character stands for. `cast` turns the character
     // into its code so the spec can do arithmetic on it.
     fn digit_value(c: char) -> int { cast(c) - cast('0') }
+    // The characters a priority is written with, said by their codes: those
+    // from the digit of the highest priority to the digit of the lowest.
+    fn is_priority_digit(c: char) -> bool {
+        cast('0') + HIGHEST_PRIORITY <= cast(c) && cast(c) <= cast('0') + LOWEST_PRIORITY
+    }
     // Whether nothing is left of a text once it is trimmed. It has no body:
     // Flux cannot look inside a string, so all it knows is that this is a
     // function, giving the same answer for the same text every time.
@@ -216,8 +221,10 @@ pub fn priority(n: u8) -> Option<Priority> {
 }
 
 /// Reads the one character that stands for a priority in the text format:
-/// `Some` exactly when it is the digit of a priority, and then that number.
-#[spec(fn(char[@c]) -> Option<u8[digit_value(c)]>[is_priority(digit_value(c))])]
+/// `Some` exactly when it is one of the characters a priority is written
+/// with, and then the number that digit stands for. That the two agree,
+/// characters on one side and numbers on the other, is what Flux proves.
+#[spec(fn(char[@c]) -> Option<u8[digit_value(c)]>[is_priority_digit(c)])]
 fn priority_digit(c: char) -> Option<Priority> {
     match c.to_digit(10) {
         Some(n) => priority(n as u8),
