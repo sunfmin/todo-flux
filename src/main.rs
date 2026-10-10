@@ -75,7 +75,7 @@ fn run(args: &[String]) -> Result<(), String> {
         Command::Add(title) => list.add(title),
         Command::SetStatus(index, to) => {
             if !list.set_status(index, to) {
-                let todo = list.get(index);
+                let todo = &list[index];
                 return Err(format!(
                     "'{}' is {} and cannot become {}; undo it first",
                     todo.title.as_str(),
@@ -178,7 +178,7 @@ fn print_list(list: &TodoList, only: Option<Status>) {
         return;
     }
     list.each_index(|index| {
-        let todo = list.get(index);
+        let todo = &list[index];
         if only.is_none_or(|status| status == todo.status) {
             println!("{:>2}. {}", index + 1, todo.line());
         }

@@ -26,7 +26,7 @@ fn position_used_without_locate(list: &mut TodoList, pos: usize) {
 fn index_reused_after_remove(mut list: TodoList, pos: usize) {
     if let Some(index) = list.locate(pos) {
         list.remove(index);
-        list.get(index);
+        let _ = &list[index];
     }
 }
 
@@ -62,7 +62,7 @@ fn more_done_than_there_are() -> Progress {
 #[should_fail]
 fn priority_used_as_slot_without_offset(list: &TodoList) -> usize {
     match list.locate(1) {
-        Some(index) => list.open_by_priority()[list.get(index).priority as usize],
+        Some(index) => list.open_by_priority()[list[index].priority as usize],
         None => 0,
     }
 }
@@ -112,5 +112,5 @@ fn command_for_one_past_the_end(_list: &TodoList, index: usize) -> Command {
 #[no_panic]
 #[spec(fn(&TodoList[@n], usize{i: i < n}) -> bool)]
 fn vec_access_claimed_not_to_panic(list: &TodoList, index: usize) -> bool {
-    list.get(index).status.is_done()
+    list[index].status.is_done()
 }
