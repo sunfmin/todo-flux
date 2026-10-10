@@ -326,6 +326,19 @@ mod status_set_theorems {
 
     use super::{Status, StatusSet};
 
+    /// A set of statuses is still one in a wider word: extending its 32
+    /// bits to 64 with zeros, or with copies of its top bit, sets no bit
+    /// that is not a status. A wider `StatusSet` would need no new proof.
+    #[trusted(reason = "a statement, not code: whoever calls it must prove it")]
+    #[spec(fn(StatusSet[@bits]) requires
+        bv_zero_extend_32_to_64(bits) & 7 == bv_zero_extend_32_to_64(bits)
+        && bv_sign_extend_32_to_64(bits) == bv_zero_extend_32_to_64(bits))]
+    fn widening_a_set_adds_no_status(_set: StatusSet) {}
+
+    fn proofs(set: StatusSet) {
+        widening_a_set_adds_no_status(set);
+    }
+
     #[spec(fn(Status) -> bool[false])]
     fn the_empty_set_holds_nothing(status: Status) -> bool {
         StatusSet::none().contains(status)
