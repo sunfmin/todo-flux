@@ -8,7 +8,7 @@
 
 use flux_rs::attrs::*;
 
-use crate::list::TodoList;
+use crate::list::{Progress, TodoList};
 
 #[should_fail]
 fn position_used_without_locate(list: &mut TodoList, pos: usize) {
@@ -38,16 +38,16 @@ fn priority_taken_from_raw_number(list: &mut TodoList, n: u8) {
 
 #[should_fail]
 #[spec(fn(&TodoList[@n]) -> usize[n])]
-fn done_count_mistaken_for_length(list: &TodoList) -> usize {
-    list.done_count()
+fn done_mistaken_for_length(list: &TodoList) -> usize {
+    list.progress().done
 }
 
 #[should_fail]
 fn percent_of_empty_list() -> usize {
-    crate::percent(0, 0)
+    TodoList::new().progress().percent()
 }
 
 #[should_fail]
-fn percent_of_more_than_everything() -> usize {
-    crate::percent(3, 2)
+fn more_done_than_there_are() -> Progress {
+    Progress { done: 3, total: 2 }
 }

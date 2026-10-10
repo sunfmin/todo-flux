@@ -101,6 +101,32 @@ mod vec_specs {
     }
 }
 
+/// How many of a number of todos are done. The invariant makes a count
+/// with more done than there are impossible to build, so everything derived
+/// from it is safe arithmetic.
+#[refined_by(done: int, total: int)]
+#[invariant(done <= total)]
+pub struct Progress {
+    #[field({usize[done] | done <= total})]
+    pub done: usize,
+    #[field(usize[total])]
+    pub total: usize,
+}
+
+impl Progress {
+    #[spec(fn(&Progress[@p]) -> usize[p.total - p.done])]
+    pub fn left(&self) -> usize {
+        self.total - self.done
+    }
+
+    /// The done share as a whole percentage. There is no share of nothing,
+    /// so the caller must have at least one todo.
+    #[spec(fn(&Progress[@p]) -> usize{v: v <= 100} requires p.total > 0)]
+    pub fn percent(&self) -> usize {
+        self.done * 100 / self.total
+    }
+}
+
 #[refined_by(len: int)]
 pub struct TodoList {
     #[field(Vec<Todo>[len])]
@@ -187,9 +213,9 @@ impl TodoList {
         self.items.insert(to, todo);
     }
 
-    /// How many todos are done, which is never more than there are.
-    #[spec(fn(&TodoList[@n]) -> usize{done: done <= n})]
-    pub fn done_count(&self) -> usize {
+    /// How much of the list is done.
+    #[spec(fn(&TodoList[@n]) -> Progress{p: p.total == n})]
+    pub fn progress(&self) -> Progress {
         let total = self.len();
         let mut done = 0;
         let mut i = 0;
@@ -200,7 +226,7 @@ impl TodoList {
             }
             i += 1;
         }
-        done
+        Progress { done, total }
     }
 
     #[spec(fn(self: &mut TodoList[@n], usize{i: i < n}) -> Todo ensures self: TodoList[n - 1])]
