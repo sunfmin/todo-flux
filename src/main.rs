@@ -17,13 +17,13 @@ use std::{
 
 use flux_rs::attrs::*;
 use list::{
-    HIGHEST_PRIORITY, LOWEST_PRIORITY, Priority, Status, Title, TodoList, priorities, priority,
-    slot,
+    HIGHEST_PRIORITY, LOWEST_PRIORITY, Priority, Status, StatusSet, Title, TodoList, priorities,
+    priority, slot,
 };
 
 const USAGE: &str = "\
 usage: todo [list]          show all todos
-       todo list <status>   show only open, doing or done todos
+       todo list <status>.. show only open, doing or done todos
        todo next            show the most urgent todo that is not done
        todo add <title>     add a todo
        todo start <n>       mark todo n as being worked on
@@ -55,8 +55,8 @@ fn main() -> ExitCode {
 /// further checks.
 #[refined_by(need: int)]
 enum Command {
-    #[variant((Option<Status>) -> Command[0])]
-    List(Option<Status>),
+    #[variant((StatusSet) -> Command[0])]
+    List(StatusSet),
     #[variant(Command[0])]
     Help,
     #[variant(Command[0])]
@@ -114,7 +114,7 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
 
     fs::write(&path, list.to_text())
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
-    written(print_list(out, &list, None))
+    written(print_list(out, &list, StatusSet::none()))
 }
 
 /// Reads the arguments as a command that `list` is long enough for.
@@ -125,11 +125,16 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
         None => ("list", args),
     };
     match (name, rest) {
-        ("list", []) => Ok(Command::List(None)),
-        ("list", [status]) => match Status::named(status) {
-            Some(status) => Ok(Command::List(Some(status))),
-            None => Err(format!("'{status}' is not open, doing or done")),
-        },
+        ("list", names) => {
+            let mut only = StatusSet::none();
+            for name in names {
+                match Status::named(name) {
+                    Some(status) => only = only.with(status),
+                    None => return Err(format!("'{name}' is not open, doing or done")),
+                }
+            }
+            Ok(Command::List(only))
+        }
         ("help" | "-h" | "--help", _) => Ok(Command::Help),
         ("next", []) => Ok(Command::Next),
         ("add", words) => match Title::new(&words.join(" ")) {
@@ -200,9 +205,10 @@ fn written(result: io::Result<()>) -> Result<(), String> {
     }
 }
 
-/// Prints the todos, all of them or only those in one status, under the
-/// numbers the other commands take, then the summary of the whole list.
-fn print_list(out: &mut dyn Write, list: &TodoList, only: Option<Status>) -> io::Result<()> {
+/// Prints the todos, all of them or (when `only` names any) just those in
+/// the statuses named, under the numbers the other commands take, then the
+/// summary of the whole list.
+fn print_list(out: &mut dyn Write, list: &TodoList, only: StatusSet) -> io::Result<()> {
     let total = list.len();
     if total == 0 {
         return writeln!(out, "nothing to do");
@@ -210,7 +216,7 @@ fn print_list(out: &mut dyn Write, list: &TodoList, only: Option<Status>) -> io:
     let mut result = Ok(());
     list.each_index(|index| {
         let todo = &list[index];
-        if result.is_ok() && only.is_none_or(|status| status == todo.status) {
+        if result.is_ok() && (only.is_empty() || only.contains(todo.status)) {
             result = writeln!(out, "{:>2}. {}", list.position(index), todo.line());
         }
     });

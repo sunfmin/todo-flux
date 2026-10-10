@@ -10,7 +10,7 @@ use flux_rs::{attrs::*, defs};
 
 use crate::{
     Command,
-    list::{Progress, Status, Title, Todo, TodoList},
+    list::{Progress, Status, StatusSet, Title, Todo, TodoList},
 };
 
 defs! {
@@ -131,4 +131,10 @@ fn status_slot_claimed_to_fit_two_slots(todo: &Todo) -> Option<usize> {
 #[spec(fn[hrn p: int -> bool](a: u8{p(a)}, b: u8{p(b)}) -> u8{v: p(v)})]
 fn sum_claimed_to_keep_any_property(a: u8, b: u8) -> u8 {
     a / 2 + b / 2
+}
+
+#[should_fail]
+#[spec(fn(StatusSet, Status) -> bool[true])]
+fn a_status_found_in_a_set_it_was_never_put_in(set: StatusSet, status: Status) -> bool {
+    set.contains(status)
 }

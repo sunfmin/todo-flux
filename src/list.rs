@@ -6,7 +6,7 @@
 
 use std::ops::Index;
 
-use flux_rs::{attrs::*, defs, macros::invariant};
+use flux_rs::{attrs::*, bitvec::BV32, defs, macros::invariant};
 
 const PRIORITY_TAG: char = '!';
 
@@ -23,6 +23,12 @@ defs! {
     fn mark_of(status: Status) -> str {
         if status == Status::Open { "[ ] " } else if status == Status::Doing { "[~] " } else { "[x] " }
     }
+    // The bit that stands for each status in a `StatusSet`, and what makes a
+    // bit pattern a set of statuses: no bit outside those three.
+    fn bit_of(status: Status) -> bitvec<32> {
+        if status == Status::Open { 1 } else if status == Status::Doing { 2 } else { 4 }
+    }
+    fn only_status_bits(bits: bitvec<32>) -> bool { bits & 7 == bits }
     // A finished todo must be reopened before it can be worked on again.
     // Hidden: other code may rely on the rule holding, not on what it says,
     // so the rule can change without any other proof having to.
@@ -95,6 +101,16 @@ impl Status {
         }
     }
 
+    /// The bit that stands for this status in a `StatusSet`.
+    #[spec(fn(&Status[@status]) -> BV32[bit_of(status)])]
+    fn bit(&self) -> BV32 {
+        match self {
+            Status::Open => BV32::new(1),
+            Status::Doing => BV32::new(2),
+            Status::Done => BV32::new(4),
+        }
+    }
+
     /// How the status starts a line of the text format.
     #[no_panic]
     #[spec(fn(&Status[@status]) -> &str[mark_of(status)])]
@@ -162,6 +178,66 @@ impl Title {
     #[trusted]
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+/// A set of statuses, kept as one bit per status. Flux reasons about the
+/// bits themselves: a set never holds a bit that is not a status.
+#[derive(Clone, Copy)]
+#[refined_by(bits: bitvec<32>)]
+#[invariant(only_status_bits(bits))]
+pub struct StatusSet {
+    #[field({BV32[bits] | only_status_bits(bits)})]
+    bits: BV32,
+}
+
+impl StatusSet {
+    #[spec(fn() -> StatusSet[0])]
+    pub fn none() -> StatusSet {
+        StatusSet { bits: BV32::new(0) }
+    }
+
+    #[spec(fn(StatusSet[@bits], Status[@status]) -> StatusSet[bits | bit_of(status)])]
+    pub fn with(self, status: Status) -> StatusSet {
+        StatusSet {
+            bits: self.bits | status.bit(),
+        }
+    }
+
+    #[spec(fn(&StatusSet[@bits], Status[@status]) -> bool[bits & bit_of(status) != 0])]
+    pub fn contains(&self, status: Status) -> bool {
+        self.bits & status.bit() != 0
+    }
+
+    #[spec(fn(&StatusSet[@bits]) -> bool[bits == 0])]
+    pub fn is_empty(&self) -> bool {
+        self.bits == 0
+    }
+}
+
+/// What makes `StatusSet` behave like a set, proved from its bits for every
+/// set and every status. Only Flux compiles these.
+#[cfg(flux)]
+mod status_set_theorems {
+    #![allow(dead_code)]
+
+    use flux_rs::attrs::*;
+
+    use super::{Status, StatusSet};
+
+    #[spec(fn(Status) -> bool[false])]
+    fn the_empty_set_holds_nothing(status: Status) -> bool {
+        StatusSet::none().contains(status)
+    }
+
+    #[spec(fn(StatusSet, Status) -> bool[true])]
+    fn a_status_put_in_is_found(set: StatusSet, status: Status) -> bool {
+        set.with(status).contains(status)
+    }
+
+    #[spec(fn(StatusSet[@bits], Status[@added], Status[@other]) -> bool[true] requires added != other)]
+    fn putting_one_status_in_adds_no_other(set: StatusSet, added: Status, other: Status) -> bool {
+        set.with(added).contains(other) == set.contains(other)
     }
 }
 
