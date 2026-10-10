@@ -47,10 +47,21 @@ defs! {
     // Flux cannot look inside a string, so all it knows is that this is a
     // function, giving the same answer for the same text every time.
     fn blank(text: str) -> bool;
+    // Where each status sits in `Status::ALL` and in the per-status counts.
+    fn slot_of(status: Status) -> int {
+        if status == Status::Open { 0 } else if status == Status::Doing { 1 } else { 2 }
+    }
     // The bit that stands for each status in a `StatusSet`, and what makes a
     // bit pattern a set of statuses: no bit outside those three.
     fn bit_of(status: Status) -> bitvec<32> {
         if status == Status::Open { 1 } else if status == Status::Doing { 2 } else { 4 }
+    }
+    // Flux does not work out `<<` on integers. This tells it the three
+    // facts `Status::bit` needs: where a one lands when shifted to a slot.
+    property OneShiftedToASlot[<<](x, y) {
+        (x == 1 && y == 0 => [<<](x, y) == 1)
+            && (x == 1 && y == 1 => [<<](x, y) == 2)
+            && (x == 1 && y == 2 => [<<](x, y) == 4)
     }
     fn only_status_bits(bits: bitvec<32>) -> bool { bits & STATUS_BITS == bits }
     // A finished todo must be reopened before it can be worked on again.
@@ -87,7 +98,7 @@ impl Status {
 
     /// Where this status sits in `ALL` and in `TodoList::by_status`.
     #[no_panic]
-    #[spec(fn(&Status) -> usize{slot: slot < STATUSES})]
+    #[spec(fn(&Status[@status]) -> usize[slot_of(status)])]
     pub fn slot(&self) -> usize {
         match self {
             Status::Open => 0,
@@ -125,14 +136,11 @@ impl Status {
         }
     }
 
-    /// The bit that stands for this status in a `StatusSet`.
+    /// The bit that stands for this status in a `StatusSet`: the one at
+    /// its slot, so the bits follow the slots and are not listed again.
     #[spec(fn(&Status[@status]) -> BV32[bit_of(status)])]
     fn bit(&self) -> BV32 {
-        match self {
-            Status::Open => BV32::new(1),
-            Status::Doing => BV32::new(2),
-            Status::Done => BV32::new(4),
-        }
+        BV32::new(1 << self.slot())
     }
 
     /// How the status starts a line of the text format.
