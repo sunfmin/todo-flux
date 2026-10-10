@@ -53,23 +53,64 @@ fn add_done_undo_rm_round_trip() {
     cli.ok(&["add", "write report"]);
     assert_eq!(
         cli.ok(&["list"]),
-        " 1. [ ] buy milk\n 2. [ ] write report\n"
+        " 1. [ ] !2 buy milk\n 2. [ ] !2 write report\n0/2 done (0%), 2 left\n"
     );
 
     assert_eq!(
         cli.ok(&["done", "2"]),
-        " 1. [ ] buy milk\n 2. [x] write report\n"
+        " 1. [ ] !2 buy milk\n 2. [x] !2 write report\n1/2 done (50%), 1 left\n"
     );
-    assert_eq!(cli.stored(), "[ ] buy milk\n[x] write report\n");
+    assert_eq!(cli.stored(), "[ ] !2 buy milk\n[x] !2 write report\n");
 
     cli.ok(&["undo", "2"]);
-    assert_eq!(cli.stored(), "[ ] buy milk\n[ ] write report\n");
+    assert_eq!(cli.stored(), "[ ] !2 buy milk\n[ ] !2 write report\n");
 
     assert_eq!(
         cli.ok(&["rm", "1"]),
-        "removed: buy milk\n 1. [ ] write report\n"
+        "removed: buy milk\n 1. [ ] !2 write report\n0/1 done (0%), 1 left\n"
     );
-    assert_eq!(cli.stored(), "[ ] write report\n");
+    assert_eq!(cli.stored(), "[ ] !2 write report\n");
+
+    assert_eq!(
+        cli.ok(&["rm", "1"]),
+        "removed: write report\nnothing to do\n"
+    );
+    assert_eq!(cli.stored(), "");
+}
+
+#[test]
+fn priority_is_set_and_kept_in_range() {
+    let cli = Cli::new("priority");
+    cli.ok(&["add", "a"]);
+    cli.ok(&["pri", "1", "1"]);
+    assert_eq!(cli.stored(), "[ ] !1 a\n");
+    cli.ok(&["pri", "1", "3"]);
+    assert_eq!(cli.stored(), "[ ] !3 a\n");
+
+    for level in ["0", "4", "-1", "high", "300"] {
+        assert!(!cli.run(&["pri", "1", level]).status.success(), "{level}");
+    }
+    assert!(!cli.run(&["pri", "2", "1"]).status.success());
+    assert_eq!(cli.stored(), "[ ] !3 a\n");
+}
+
+#[test]
+fn mv_reorders_without_losing_todos() {
+    let cli = Cli::new("mv");
+    for title in ["a", "b", "c"] {
+        cli.ok(&["add", title]);
+    }
+    cli.ok(&["mv", "1", "3"]);
+    assert_eq!(cli.stored(), "[ ] !2 b\n[ ] !2 c\n[ ] !2 a\n");
+    cli.ok(&["mv", "3", "1"]);
+    assert_eq!(cli.stored(), "[ ] !2 a\n[ ] !2 b\n[ ] !2 c\n");
+    cli.ok(&["mv", "2", "2"]);
+    assert_eq!(cli.stored(), "[ ] !2 a\n[ ] !2 b\n[ ] !2 c\n");
+
+    for args in [["mv", "0", "1"], ["mv", "1", "4"], ["mv", "4", "1"]] {
+        assert!(!cli.run(&args).status.success(), "{args:?}");
+    }
+    assert_eq!(cli.stored(), "[ ] !2 a\n[ ] !2 b\n[ ] !2 c\n");
 }
 
 #[test]
@@ -88,7 +129,7 @@ fn out_of_range_positions_are_rejected_without_changing_the_file() {
         assert!(!out.status.success(), "{args:?} should fail");
         assert!(out.stdout.is_empty());
     }
-    assert_eq!(cli.stored(), "[ ] only one\n");
+    assert_eq!(cli.stored(), "[ ] !2 only one\n");
 }
 
 #[test]
@@ -97,19 +138,38 @@ fn bad_commands_fail() {
     assert!(!cli.run(&["add"]).status.success());
     assert!(!cli.run(&["add", "  "]).status.success());
     assert!(!cli.run(&["frobnicate"]).status.success());
+    assert!(!cli.run(&["done"]).status.success());
+    assert!(!cli.run(&["done", "1", "2"]).status.success());
+    assert!(!cli.run(&["mv", "1"]).status.success());
     assert!(!cli.file.exists());
 }
 
 #[test]
 fn hand_edited_file_loads() {
     let cli = Cli::new("hand-edited");
-    fs::write(&cli.file, "no mark\n\n[x] finished\n").unwrap();
-    assert_eq!(cli.ok(&["list"]), " 1. [ ] no mark\n 2. [x] finished\n");
+    fs::write(
+        &cli.file,
+        "no mark\n\n[x] finished\n[ ] !1 urgent\n[x] !9 bad priority\n!3 low\n",
+    )
+    .unwrap();
+    cli.ok(&["mv", "1", "1"]);
+    assert_eq!(
+        cli.stored(),
+        "[ ] !2 no mark\n[x] !2 finished\n[ ] !1 urgent\n[x] !2 !9 bad priority\n[ ] !3 low\n"
+    );
 }
 
 #[test]
 fn multi_line_title_stays_one_todo() {
     let cli = Cli::new("multi-line");
     cli.ok(&["add", "line one\nline two"]);
-    assert_eq!(cli.stored(), "[ ] line one line two\n");
+    assert_eq!(cli.stored(), "[ ] !2 line one line two\n");
+}
+
+#[test]
+fn title_that_looks_like_a_priority_survives_a_round_trip() {
+    let cli = Cli::new("tag-title");
+    cli.ok(&["add", "!1 not a priority"]);
+    cli.ok(&["done", "1"]);
+    assert_eq!(cli.stored(), "[x] !2 !1 not a priority\n");
 }

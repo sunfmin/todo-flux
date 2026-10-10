@@ -8,14 +8,17 @@ mod list;
 
 use std::{env, fs, io, path::PathBuf, process::ExitCode};
 
-use list::TodoList;
+use flux_rs::attrs::*;
+use list::{HIGHEST_PRIORITY, LOWEST_PRIORITY, Priority, TodoList, priority};
 
 const USAGE: &str = "\
-usage: todo [list]        show all todos
-       todo add <title>   add a todo
-       todo done <n>      mark todo n as done
-       todo undo <n>      mark todo n as not done
-       todo rm <n>        delete todo n
+usage: todo [list]          show all todos
+       todo add <title>     add a todo
+       todo done <n>        mark todo n as done
+       todo undo <n>        mark todo n as not done
+       todo pri <n> <1-3>   set the priority of todo n (1 is highest)
+       todo mv <n> <m>      move todo n to position m
+       todo rm <n>          delete todo n
 
 Todos are stored in $TODO_FILE (default: ~/.todo.txt).";
 
@@ -38,33 +41,44 @@ fn run(args: &[String]) -> Result<(), String> {
     let path = todo_file()?;
     let mut list = load(&path)?;
 
-    match command {
-        "list" => {
+    match (command, rest) {
+        ("list", []) => {
             print_list(&list);
             return Ok(());
         }
-        "add" => {
-            let title = rest.join(" ");
+        ("help" | "-h" | "--help", _) => {
+            println!("{USAGE}");
+            return Ok(());
+        }
+        ("add", words) => {
+            let title = words.join(" ");
             if title.trim().is_empty() {
                 return Err("add needs a title".to_string());
             }
             list.add(title.trim());
         }
-        "done" | "undo" | "rm" => {
-            let pos = position(rest)?;
-            let Some(index) = list.locate(pos) else {
-                return Err(format!("no todo {pos} (the list has {})", list.len()));
-            };
-            match command {
-                "rm" => println!("removed: {}", list.remove(index).title),
-                _ => list.set_done(index, command == "done"),
-            }
+        ("done", [n]) => {
+            let index = index_of(&list, n)?;
+            list.set_done(index, true);
         }
-        "help" | "-h" | "--help" => {
-            println!("{USAGE}");
-            return Ok(());
+        ("undo", [n]) => {
+            let index = index_of(&list, n)?;
+            list.set_done(index, false);
         }
-        _ => return Err(format!("unknown command '{command}'\n{USAGE}")),
+        ("pri", [n, level]) => {
+            let index = index_of(&list, n)?;
+            list.set_priority(index, priority_of(level)?);
+        }
+        ("mv", [n, m]) => {
+            let from = index_of(&list, n)?;
+            let to = index_of(&list, m)?;
+            list.move_to(from, to);
+        }
+        ("rm", [n]) => {
+            let index = index_of(&list, n)?;
+            println!("removed: {}", list.remove(index).title);
+        }
+        _ => return Err(format!("cannot run '{}'\n{USAGE}", args.join(" "))),
     }
 
     fs::write(&path, list.to_text())
@@ -92,20 +106,49 @@ fn load(path: &PathBuf) -> Result<TodoList, String> {
     }
 }
 
-fn position(args: &[String]) -> Result<usize, String> {
-    match args {
-        [n] => n.parse().map_err(|_| format!("'{n}' is not a todo number")),
-        _ => Err("expected exactly one todo number".to_string()),
+/// Turns the 1-based todo number a user typed into a proved-valid index.
+#[spec(fn(&TodoList[@n], &str) -> Result<usize{i: i < n}, String>)]
+fn index_of(list: &TodoList, arg: &str) -> Result<usize, String> {
+    let Ok(pos) = arg.parse() else {
+        return Err(format!("'{arg}' is not a todo number"));
+    };
+    match list.locate(pos) {
+        Some(index) => Ok(index),
+        None => Err(format!("no todo {pos} (the list has {})", list.len())),
+    }
+}
+
+#[spec(fn(&str) -> Result<Priority, String>)]
+fn priority_of(arg: &str) -> Result<Priority, String> {
+    match arg.parse().ok().and_then(priority) {
+        Some(priority) => Ok(priority),
+        None => Err(format!(
+            "priority must be {HIGHEST_PRIORITY} to {LOWEST_PRIORITY}, not '{arg}'"
+        )),
     }
 }
 
 fn print_list(list: &TodoList) {
-    if list.len() == 0 {
+    let total = list.len();
+    if total == 0 {
         println!("nothing to do");
+        return;
     }
     let mut i = 0;
-    while i < list.len() {
+    while i < total {
         println!("{:>2}. {}", i + 1, list.get(i).line());
         i += 1;
     }
+    let done = list.done_count();
+    println!(
+        "{done}/{total} done ({}%), {} left",
+        percent(done, total),
+        total - done
+    );
+}
+
+/// `part` as a whole percentage of `whole`.
+#[spec(fn(part: usize, whole: usize{whole > 0 && part <= whole}) -> usize{p: p <= 100})]
+fn percent(part: usize, whole: usize) -> usize {
+    part * 100 / whole
 }
