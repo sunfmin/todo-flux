@@ -1,0 +1,18 @@
+[package]
+name = "todo"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Refinement attributes; they expand to nothing under a plain `cargo build`.
+flux-rs = { git = "https://github.com/flux-rs/flux.git", rev = "b2f3e31e17727ffe08c2efee1e7aa0bc4f0a66f9" }
+# Refinement specs for core and alloc (Option, Vec, slices, ...).
+flux-core = { git = "https://github.com/flux-rs/flux.git", rev = "b2f3e31e17727ffe08c2efee1e7aa0bc4f0a66f9" }
+flux-alloc = { git = "https://github.com/flux-rs/flux.git", rev = "b2f3e31e17727ffe08c2efee1e7aa0bc4f0a66f9" }
+
+# `cargo flux` verifies the refinement types in this crate.
+[package.metadata.flux]
+enabled = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(flux)'] }
