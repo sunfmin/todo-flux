@@ -86,17 +86,32 @@ a runtime panic or a silently wrong file.
 
 The table follows the sections of the
 [specifications guide](https://flux-rs.github.io/flux/guide/specifications.html);
-each has a use in the code. `tests/guide_coverage.rs` lists the line for
-every section and fails when a refactor removes the last use of one. Some
-uses are small, and it is fair to say so:
+each has a use in the code, and a proof that rests on that use.
+`mutants.py` is the check: for every section it breaks the one line that
+uses the capability, runs Flux, and expects the program to be rejected. A
+line that can be broken without Flux noticing is doing no work, and a line
+that is gone is reported too, so a refactor cannot quietly drop a
+capability.
 
+```
+uv run mutants.py        # all 78 mutants, about six minutes
+uv run mutants.py Sets   # only the sections whose name contains "Sets"
+```
+
+Three things it is fair to say about what that shows:
+
+- Flux proves at compile time. The theorems (`status_theorems`,
+  `status_set_theorems`, `picks_theorems`, `title_theorems`) and the
+  rejected examples in `src/rejected.rs` are compiled only under Flux; the
+  program does not call them, and does not need to.
 - `uif_ops` can only take knowledge away from the solver, so it proves
-  nothing new here. It shows which proofs depend on arithmetic.
-- The theorems (`status_theorems`, `status_set_theorems`, `picks_theorems`,
-  `title_theorems`) are compiled only under Flux. They state rules; the
-  program does not call them.
-- Include patterns also work from the command line: `./verify.sh remove_all`
-  checks only the functions whose path contains that name.
+  nothing new. It shows which proofs depend on arithmetic.
+- Removing `#[flux_rs::ignore]` from `main` breaks nothing, since Flux can
+  check `main`. That mutant is caught by Flux's count of ignored functions
+  instead.
+
+Include patterns also work from the command line: `./verify.sh remove_all`
+checks only the functions whose path contains that name.
 
 ## Build, test, verify
 
