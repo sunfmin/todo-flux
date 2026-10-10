@@ -91,9 +91,8 @@ each has a use in the code. Some uses are small, and it is fair to say so:
 - The theorems (`status_theorems`, `status_set_theorems`, `picks_theorems`,
   `title_theorems`) are compiled only under Flux. They state rules; the
   program does not call them.
-- Include patterns also work from the command line. To check one function
-  instead of the crate:
-  `./verify.sh check --only-check='def:list::TodoList::remove_all'`.
+- Include patterns also work from the command line: `./verify.sh remove_all`
+  checks only the functions whose path contains that name.
 
 ## Build, test, verify
 
@@ -101,6 +100,7 @@ each has a use in the code. Some uses are small, and it is fair to say so:
 cargo build        # stable Rust; the Flux attributes expand to nothing
 cargo test         # end-to-end tests of the binary
 ./verify.sh        # run the Flux verifier
+./verify.sh span   # verify one function by name
 ```
 
 `./verify.sh` needs `cargo-flux`, `fixpoint` and `z3`; see the
