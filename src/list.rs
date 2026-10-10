@@ -878,7 +878,10 @@ impl TodoList {
     /// length.
     // No count can pass the list's length, but that needs a fact about every
     // element of the array on every turn of the loop, which Flux cannot infer.
-    #[opts(check_overflow = "none")]
+    // So the additions go unchecked, and `uif_ops` makes sure nothing else
+    // leans on them: with `+` turned into an unknown function, Flux still
+    // proves every index here is in bounds.
+    #[opts(check_overflow = "none", uif_ops = "+")]
     #[spec(fn(&TodoList, slot_of: fn(&Todo) -> Option<usize{slot: slot < N}>) -> [usize; N])]
     fn tally<const N: usize>(&self, slot_of: fn(&Todo) -> Option<usize>) -> [usize; N] {
         let mut counts = [0; N];
