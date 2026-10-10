@@ -97,7 +97,7 @@ fn status_follows_the_rules() {
     assert!(!out.status.success());
     assert_eq!(
         String::from_utf8_lossy(&out.stderr),
-        "todo: todo 1 is done and cannot become doing; undo it first\n"
+        "todo: 'a' is done and cannot become doing; undo it first\n"
     );
     assert_eq!(cli.stored(), "[x] !2 a\n");
 

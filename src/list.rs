@@ -244,6 +244,7 @@ impl Progress {
 }
 
 #[refined_by(len: int)]
+#[invariant(len >= 0)]
 pub struct TodoList {
     #[field(Vec<Todo>[len])]
     items: Vec<Todo>,
