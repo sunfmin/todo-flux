@@ -8,30 +8,72 @@ use flux_rs::{attrs::*, macros::invariant};
 
 const DONE_MARK: &str = "[x] ";
 const OPEN_MARK: &str = "[ ] ";
+const PRIORITY_TAG: char = '!';
+
+pub const HIGHEST_PRIORITY: u8 = 1;
+pub const LOWEST_PRIORITY: u8 = 3;
+const DEFAULT_PRIORITY: Priority = 2;
+
+/// How urgent a todo is. Flux only lets a value in the valid range have this
+/// type, so the only way to make one from an arbitrary number is `priority`.
+#[alias(type Priority = u8{p: HIGHEST_PRIORITY <= p && p <= LOWEST_PRIORITY})]
+pub type Priority = u8;
+
+/// Checks a number typed by a user (or found in a file) against the range.
+// Flux reasons about the comparisons; it has no spec for `RangeInclusive::contains`.
+#[allow(clippy::manual_range_contains)]
+#[spec(fn(n: u8) -> Option<Priority>)]
+pub fn priority(n: u8) -> Option<Priority> {
+    if HIGHEST_PRIORITY <= n && n <= LOWEST_PRIORITY {
+        Some(n)
+    } else {
+        None
+    }
+}
+
+#[refined_by()]
 pub struct Todo {
     pub title: String,
     pub done: bool,
+    #[field(Priority)]
+    pub priority: Priority,
 }
 
 impl Todo {
-    /// The todo as one line of the text format: `[x] title` or `[ ] title`.
+    /// The todo as one line of the text format, e.g. `[x] !2 title`.
     pub fn line(&self) -> String {
         let mark = if self.done { DONE_MARK } else { OPEN_MARK };
-        format!("{mark}{}", self.title)
+        format!("{mark}{PRIORITY_TAG}{} {}", self.priority, self.title)
     }
 
-    /// Inverse of `line`. A line without a mark is an open todo, so any
-    /// hand-edited file still loads.
+    /// Inverse of `line`. A missing mark means open and a missing or invalid
+    /// priority means the default, so any hand-edited file still loads.
     fn from_line(line: &str) -> Todo {
-        let (done, title) = match line.strip_prefix(DONE_MARK) {
-            Some(title) => (true, title),
+        let (done, rest) = match line.strip_prefix(DONE_MARK) {
+            Some(rest) => (true, rest),
             None => (false, line.strip_prefix(OPEN_MARK).unwrap_or(line)),
         };
+        let (priority, title) = split_priority(rest);
         Todo {
             title: title.to_string(),
             done,
+            priority,
         }
     }
+}
+
+/// Splits `!2 title` into its priority and title. Text without a valid
+/// priority tag is all title.
+#[spec(fn(&str) -> (Priority, &str))]
+fn split_priority(rest: &str) -> (Priority, &str) {
+    if let Some((tag, title)) = rest.split_once(' ')
+        && let Some(digits) = tag.strip_prefix(PRIORITY_TAG)
+        && let Ok(n) = digits.parse()
+        && let Some(priority) = priority(n)
+    {
+        return (priority, title);
+    }
+    (DEFAULT_PRIORITY, rest)
 }
 
 /// `flux-alloc` has no specs for `Vec::remove` and `Vec::insert` yet. Only Flux reads this, so
@@ -97,7 +139,11 @@ impl TodoList {
     #[spec(fn(self: &mut TodoList[@n], title: &str) ensures self: TodoList[n + 1])]
     pub fn add(&mut self, title: &str) {
         let title = title.replace(['\n', '\r'], " ");
-        self.push(Todo { title, done: false });
+        self.push(Todo {
+            title,
+            done: false,
+            priority: DEFAULT_PRIORITY,
+        });
     }
 
     /// Turns the 1-based position a user types into a proved-valid index,
@@ -119,6 +165,11 @@ impl TodoList {
     #[spec(fn(&mut TodoList[@n], usize{i: i < n}, done: bool))]
     pub fn set_done(&mut self, index: usize, done: bool) {
         self.items[index].done = done;
+    }
+
+    #[spec(fn(&mut TodoList[@n], usize{i: i < n}, Priority))]
+    pub fn set_priority(&mut self, index: usize, priority: Priority) {
+        self.items[index].priority = priority;
     }
 
     /// Moves a todo to another position. The list keeps its length: nothing

@@ -9,13 +9,14 @@ mod list;
 use std::{env, fs, io, path::PathBuf, process::ExitCode};
 
 use flux_rs::attrs::*;
-use list::TodoList;
+use list::{HIGHEST_PRIORITY, LOWEST_PRIORITY, Priority, TodoList, priority};
 
 const USAGE: &str = "\
 usage: todo [list]          show all todos
        todo add <title>     add a todo
        todo done <n>        mark todo n as done
        todo undo <n>        mark todo n as not done
+       todo pri <n> <1-3>   set the priority of todo n (1 is highest)
        todo mv <n> <m>      move todo n to position m
        todo rm <n>          delete todo n
 
@@ -64,6 +65,10 @@ fn run(args: &[String]) -> Result<(), String> {
             let index = index_of(&list, n)?;
             list.set_done(index, false);
         }
+        ("pri", [n, level]) => {
+            let index = index_of(&list, n)?;
+            list.set_priority(index, priority_of(level)?);
+        }
         ("mv", [n, m]) => {
             let from = index_of(&list, n)?;
             let to = index_of(&list, m)?;
@@ -110,6 +115,16 @@ fn index_of(list: &TodoList, arg: &str) -> Result<usize, String> {
     match list.locate(pos) {
         Some(index) => Ok(index),
         None => Err(format!("no todo {pos} (the list has {})", list.len())),
+    }
+}
+
+#[spec(fn(&str) -> Result<Priority, String>)]
+fn priority_of(arg: &str) -> Result<Priority, String> {
+    match arg.parse().ok().and_then(priority) {
+        Some(priority) => Ok(priority),
+        None => Err(format!(
+            "priority must be {HIGHEST_PRIORITY} to {LOWEST_PRIORITY}, not '{arg}'"
+        )),
     }
 }
 
