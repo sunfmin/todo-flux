@@ -124,6 +124,12 @@ impl Title {
     }
 }
 
+/// Where a priority's count sits in the array `open_by_priority` returns.
+#[spec(fn(p: Priority) -> usize{slot: slot < PRIORITY_LEVELS})]
+pub fn slot(priority: Priority) -> usize {
+    (priority - HIGHEST_PRIORITY) as usize
+}
+
 #[refined_by(status: Status)]
 pub struct Todo {
     pub title: Title,
@@ -232,7 +238,8 @@ impl Progress {
     /// so the caller must have at least one todo.
     #[spec(fn(&Progress[@p]) -> usize{v: v <= 100} requires p.total > 0)]
     pub fn percent(&self) -> usize {
-        self.done * 100 / self.total
+        // In u128 the product cannot overflow, however long the list is.
+        (self.done as u128 * 100 / self.total as u128) as usize
     }
 }
 
@@ -349,12 +356,15 @@ impl TodoList {
 
     /// How many open todos there are at each priority, highest first. A
     /// priority always has a slot: its range is the array's length.
+    // No count can pass the list's length, but that needs a fact about every
+    // element of the array on every turn of the loop, which Flux cannot infer.
+    #[opts(check_overflow = "none")]
     pub fn open_by_priority(&self) -> [usize; PRIORITY_LEVELS] {
         let mut counts = [0; PRIORITY_LEVELS];
         self.each_index(|index| {
             let todo = self.get(index);
             if !todo.status.is_done() {
-                counts[(todo.priority - HIGHEST_PRIORITY) as usize] += 1;
+                counts[slot(todo.priority)] += 1;
             }
         });
         counts
