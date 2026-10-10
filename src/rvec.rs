@@ -5,6 +5,10 @@
 //! this file is where the claims about the vector are made by hand: what each
 //! operation does to the length, and that reading an index below the length
 //! cannot panic. Only what the todo list uses is here.
+//!
+//! No function carries a `trusted` attribute: `Cargo.toml` names this whole
+//! file as trusted with an include pattern, so nothing added here can be
+//! left out by mistake.
 
 use flux_rs::attrs::*;
 
@@ -16,54 +20,46 @@ pub struct RVec<T> {
 }
 
 impl<T> RVec<T> {
-    #[trusted]
     #[no_panic]
     #[spec(fn() -> RVec<T>[0])]
     pub fn new() -> RVec<T> {
         RVec { inner: Vec::new() }
     }
 
-    #[trusted]
     #[no_panic]
     #[spec(fn(&RVec<T>[@n]) -> usize[n])]
     pub fn len(&self) -> usize {
         self.inner.len()
     }
 
-    #[trusted]
     #[no_panic]
     #[spec(fn(&RVec<T>[@n], index: usize{index < n}) -> &T)]
     pub fn get(&self, index: usize) -> &T {
         &self.inner[index]
     }
 
-    #[trusted]
     #[no_panic]
     #[spec(fn(&mut RVec<T>[@n], index: usize{index < n}) -> &mut T)]
     pub fn get_mut(&mut self, index: usize) -> &mut T {
         &mut self.inner[index]
     }
 
-    #[trusted]
     #[no_panic]
     #[spec(fn(&RVec<T>[@n]) -> &[T][n])]
     pub fn as_slice(&self) -> &[T] {
         &self.inner
     }
 
-    #[trusted]
     #[spec(fn(self: &mut RVec<T>[@n], T) ensures self: RVec<T>[n + 1])]
     pub fn push(&mut self, item: T) {
         self.inner.push(item);
     }
 
-    #[trusted]
     #[spec(fn(self: &mut RVec<T>[@n], index: usize{index < n}) -> T ensures self: RVec<T>[n - 1])]
     pub fn remove(&mut self, index: usize) -> T {
         self.inner.remove(index)
     }
 
-    #[trusted]
     #[spec(fn(self: &mut RVec<T>[@n], index: usize{index <= n}, T) ensures self: RVec<T>[n + 1])]
     pub fn insert(&mut self, index: usize, item: T) {
         self.inner.insert(index, item);
