@@ -1,13 +1,11 @@
 //! The todo list and its on-disk text format.
 //!
 //! Flux tracks the list's length in its type, so every index handed to
-//! `get`, `set_done` or `remove` is proved in bounds at compile time. The
+//! `get`, `set_status` or `remove` is proved in bounds at compile time. The
 //! only way to obtain such an index from untrusted input is `locate`.
 
 use flux_rs::{attrs::*, defs, macros::invariant};
 
-const DONE_MARK: &str = "[x] ";
-const OPEN_MARK: &str = "[ ] ";
 const PRIORITY_TAG: char = '!';
 
 pub const HIGHEST_PRIORITY: u8 = 1;
@@ -19,6 +17,49 @@ pub const PRIORITY_LEVELS: usize = (LOWEST_PRIORITY - HIGHEST_PRIORITY + 1) as u
 defs! {
     fn is_priority(p: int) -> bool { HIGHEST_PRIORITY <= p && p <= LOWEST_PRIORITY }
     fn is_position(pos: int, len: int) -> bool { 1 <= pos && pos <= len }
+    // A finished todo must be reopened before it can be worked on again.
+    fn can_become(from: Status, to: Status) -> bool { !(from == Status::Done && to == Status::Doing) }
+}
+
+/// Where a todo stands. `reflect` lets the specs talk about the variants.
+#[reflect]
+#[derive(Clone, Copy)]
+pub enum Status {
+    Open,
+    Doing,
+    Done,
+}
+
+impl Status {
+    const ALL: [Status; 3] = [Status::Open, Status::Doing, Status::Done];
+
+    /// Whether a todo in this status may move to `to`.
+    #[spec(fn(&Status[@from], to: Status) -> bool[can_become(from, to)])]
+    pub fn can_become(&self, to: Status) -> bool {
+        !matches!((self, to), (Status::Done, Status::Doing))
+    }
+
+    #[spec(fn(&Status[@s]) -> bool[s == Status::Done])]
+    pub fn is_done(&self) -> bool {
+        matches!(self, Status::Done)
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            Status::Open => "open",
+            Status::Doing => "doing",
+            Status::Done => "done",
+        }
+    }
+
+    /// How the status starts a line of the text format.
+    fn mark(&self) -> &'static str {
+        match self {
+            Status::Open => "[ ] ",
+            Status::Doing => "[~] ",
+            Status::Done => "[x] ",
+        }
+    }
 }
 
 /// How urgent a todo is. Flux only lets a value in the valid range have this
@@ -39,10 +80,11 @@ pub fn priority(n: u8) -> Option<Priority> {
     }
 }
 
-#[refined_by()]
+#[refined_by(status: Status)]
 pub struct Todo {
     pub title: String,
-    pub done: bool,
+    #[field(Status[status])]
+    pub status: Status,
     #[field(Priority)]
     pub priority: Priority,
 }
@@ -50,23 +92,40 @@ pub struct Todo {
 impl Todo {
     /// The todo as one line of the text format, e.g. `[x] !2 title`.
     pub fn line(&self) -> String {
-        let mark = if self.done { DONE_MARK } else { OPEN_MARK };
+        let mark = self.status.mark();
         format!("{mark}{PRIORITY_TAG}{} {}", self.priority, self.title)
     }
 
     /// Inverse of `line`. A missing mark means open and a missing or invalid
     /// priority means the default, so any hand-edited file still loads.
     fn from_line(line: &str) -> Todo {
-        let (done, rest) = match line.strip_prefix(DONE_MARK) {
-            Some(rest) => (true, rest),
-            None => (false, line.strip_prefix(OPEN_MARK).unwrap_or(line)),
-        };
+        let mut status = Status::Open;
+        let mut rest = line;
+        for candidate in Status::ALL {
+            if let Some(after_mark) = line.strip_prefix(candidate.mark()) {
+                status = candidate;
+                rest = after_mark;
+            }
+        }
         let (priority, title) = split_priority(rest);
         Todo {
             title: title.to_string(),
-            done,
+            status,
             priority,
         }
+    }
+
+    /// Moves the todo to another status if the rules allow it, and says
+    /// whether it did. Flux checks this against the rules: it moves exactly
+    /// when `can_become` holds and otherwise leaves the status alone.
+    #[spec(fn(self: &mut Todo[@t], to: Status) -> bool[can_become(t.status, to)]
+           ensures self: Todo{v: v.status == if can_become(t.status, to) { to } else { t.status }})]
+    pub fn try_become(&mut self, to: Status) -> bool {
+        let allowed = self.status.can_become(to);
+        if allowed {
+            self.status = to;
+        }
+        allowed
     }
 }
 
@@ -175,7 +234,7 @@ impl TodoList {
         let title = title.replace(['\n', '\r'], " ");
         self.push(Todo {
             title,
-            done: false,
+            status: Status::Open,
             priority: DEFAULT_PRIORITY,
         });
     }
@@ -196,9 +255,11 @@ impl TodoList {
         &self.items[index]
     }
 
-    #[spec(fn(&mut TodoList[@n], usize{i: i < n}, done: bool))]
-    pub fn set_done(&mut self, index: usize, done: bool) {
-        self.items[index].done = done;
+    /// Moves a todo to another status if the rules allow it, and says
+    /// whether it did.
+    #[spec(fn(&mut TodoList[@n], usize{i: i < n}, to: Status) -> bool)]
+    pub fn set_status(&mut self, index: usize, to: Status) -> bool {
+        self.items[index].try_become(to)
     }
 
     #[spec(fn(&mut TodoList[@n], usize{i: i < n}, Priority))]
@@ -222,7 +283,7 @@ impl TodoList {
         let mut i = 0;
         while i < total {
             invariant!(done: int; done <= i && i <= total);
-            if self.get(i).done {
+            if self.get(i).status.is_done() {
                 done += 1;
             }
             i += 1;
@@ -237,7 +298,7 @@ impl TodoList {
         let mut i = 0;
         while i < self.len() {
             let todo = self.get(i);
-            if !todo.done {
+            if !todo.status.is_done() {
                 counts[(todo.priority - HIGHEST_PRIORITY) as usize] += 1;
             }
             i += 1;

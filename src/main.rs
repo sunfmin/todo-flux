@@ -11,13 +11,14 @@ mod rejected;
 use std::{env, fs, io, path::PathBuf, process::ExitCode};
 
 use flux_rs::attrs::*;
-use list::{HIGHEST_PRIORITY, LOWEST_PRIORITY, Priority, TodoList, priority};
+use list::{HIGHEST_PRIORITY, LOWEST_PRIORITY, Priority, Status, TodoList, priority};
 
 const USAGE: &str = "\
 usage: todo [list]          show all todos
        todo add <title>     add a todo
+       todo start <n>       mark todo n as being worked on
        todo done <n>        mark todo n as done
-       todo undo <n>        mark todo n as not done
+       todo undo <n>        mark todo n as open again
        todo pri <n> <1-3>   set the priority of todo n (1 is highest)
        todo mv <n> <m>      move todo n to position m
        todo rm <n>          delete todo n
@@ -59,14 +60,9 @@ fn run(args: &[String]) -> Result<(), String> {
             }
             list.add(title.trim());
         }
-        ("done", [n]) => {
-            let index = index_of(&list, n)?;
-            list.set_done(index, true);
-        }
-        ("undo", [n]) => {
-            let index = index_of(&list, n)?;
-            list.set_done(index, false);
-        }
+        ("start", [n]) => change_status(&mut list, n, Status::Doing)?,
+        ("done", [n]) => change_status(&mut list, n, Status::Done)?,
+        ("undo", [n]) => change_status(&mut list, n, Status::Open)?,
         ("pri", [n, level]) => {
             let index = index_of(&list, n)?;
             list.set_priority(index, priority_of(level)?);
@@ -118,6 +114,19 @@ fn index_of(list: &TodoList, arg: &str) -> Result<usize, String> {
         Some(index) => Ok(index),
         None => Err(format!("no todo {pos} (the list has {})", list.len())),
     }
+}
+
+fn change_status(list: &mut TodoList, arg: &str, to: Status) -> Result<(), String> {
+    let index = index_of(list, arg)?;
+    if list.set_status(index, to) {
+        return Ok(());
+    }
+    let from = list.get(index).status;
+    Err(format!(
+        "todo {arg} is {} and cannot become {}; undo it first",
+        from.name(),
+        to.name()
+    ))
 }
 
 #[spec(fn(&str) -> Result<Priority, String>)]

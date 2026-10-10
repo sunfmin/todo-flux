@@ -79,6 +79,37 @@ fn add_done_undo_rm_round_trip() {
 }
 
 #[test]
+fn status_follows_the_rules() {
+    let cli = Cli::new("status");
+    cli.ok(&["add", "a"]);
+
+    cli.ok(&["start", "1"]);
+    assert_eq!(cli.stored(), "[~] !2 a\n");
+    cli.ok(&["start", "1"]);
+    cli.ok(&["undo", "1"]);
+    assert_eq!(cli.stored(), "[ ] !2 a\n");
+    cli.ok(&["start", "1"]);
+    cli.ok(&["done", "1"]);
+    cli.ok(&["done", "1"]);
+    assert_eq!(cli.stored(), "[x] !2 a\n");
+
+    let out = cli.run(&["start", "1"]);
+    assert!(!out.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&out.stderr),
+        "todo: todo 1 is done and cannot become doing; undo it first\n"
+    );
+    assert_eq!(cli.stored(), "[x] !2 a\n");
+
+    cli.ok(&["undo", "1"]);
+    cli.ok(&["start", "1"]);
+    assert!(
+        cli.ok(&["list"])
+            .starts_with(" 1. [~] !2 a\n0/1 done (0%), 1 left\n")
+    );
+}
+
+#[test]
 fn priority_is_set_and_kept_in_range() {
     let cli = Cli::new("priority");
     cli.ok(&["add", "a"]);

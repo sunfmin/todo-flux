@@ -6,13 +6,17 @@
 //! program.
 #![allow(dead_code)]
 
-use flux_rs::attrs::*;
+use flux_rs::{attrs::*, defs};
 
-use crate::list::{Progress, TodoList};
+use crate::list::{Progress, Status, Todo, TodoList};
+
+defs! {
+    use crate::list::can_become;
+}
 
 #[should_fail]
 fn position_used_without_locate(list: &mut TodoList, pos: usize) {
-    list.set_done(pos, true);
+    list.set_status(pos, Status::Done);
 }
 
 #[should_fail]
@@ -58,4 +62,12 @@ fn priority_used_as_slot_without_offset(list: &TodoList) -> usize {
         Some(index) => list.open_by_priority()[list.get(index).priority as usize],
         None => 0,
     }
+}
+
+#[should_fail]
+#[spec(fn(todo: &mut Todo[@t], to: Status) -> bool[can_become(t.status, to)]
+       ensures todo: Todo{v: v.status == if can_become(t.status, to) { to } else { t.status }})]
+fn status_changed_without_asking_the_rules(todo: &mut Todo, to: Status) -> bool {
+    todo.status = to;
+    todo.status.can_become(to)
 }
