@@ -136,6 +136,30 @@ fn list_can_show_one_status_under_the_original_numbers() {
 }
 
 #[test]
+fn next_is_the_first_open_todo_of_the_most_urgent_priority() {
+    let cli = Cli::new("next");
+    assert_eq!(cli.ok(&["next"]), "nothing to do\n");
+    for title in ["a", "b", "c", "d"] {
+        cli.ok(&["add", title]);
+    }
+    assert_eq!(cli.ok(&["next"]), " 1. [ ] !2 a\n");
+
+    cli.ok(&["pri", "1", "3"]);
+    cli.ok(&["pri", "3", "1"]);
+    cli.ok(&["pri", "4", "1"]);
+    assert_eq!(cli.ok(&["next"]), " 3. [ ] !1 c\n");
+
+    cli.ok(&["done", "3"]);
+    cli.ok(&["start", "4"]);
+    assert_eq!(cli.ok(&["next"]), " 4. [~] !1 d\n");
+
+    for n in ["1", "2", "4"] {
+        cli.ok(&["done", n]);
+    }
+    assert_eq!(cli.ok(&["next"]), "nothing to do\n");
+}
+
+#[test]
 fn priority_is_set_and_kept_in_range() {
     let cli = Cli::new("priority");
     cli.ok(&["add", "a"]);

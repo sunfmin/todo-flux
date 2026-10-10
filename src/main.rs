@@ -24,6 +24,7 @@ use list::{
 const USAGE: &str = "\
 usage: todo [list]          show all todos
        todo list <status>   show only open, doing or done todos
+       todo next            show the most urgent todo that is not done
        todo add <title>     add a todo
        todo start <n>       mark todo n as being worked on
        todo done <n>        mark todo n as done
@@ -58,6 +59,8 @@ enum Command {
     List(Option<Status>),
     #[variant(Command[0])]
     Help,
+    #[variant(Command[0])]
+    Next,
     #[variant((Title) -> Command[0])]
     Add(Title),
     #[variant((usize[@index], Status) -> Command[index + 1])]
@@ -82,6 +85,12 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
         }
         Command::Help => {
             return written(writeln!(out, "{USAGE}"));
+        }
+        Command::Next => {
+            return written(match list.next() {
+                Some(index) => writeln!(out, "{:>2}. {}", list.position(index), list[index].line()),
+                None => writeln!(out, "nothing to do"),
+            });
         }
         Command::Add(title) => list.add(title),
         Command::SetStatus(index, to) => {
@@ -122,6 +131,7 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
             None => Err(format!("'{status}' is not open, doing or done")),
         },
         ("help" | "-h" | "--help", _) => Ok(Command::Help),
+        ("next", []) => Ok(Command::Next),
         ("add", words) => match Title::new(&words.join(" ")) {
             Some(title) => Ok(Command::Add(title)),
             None => Err("add needs a title".to_string()),
@@ -201,7 +211,7 @@ fn print_list(out: &mut dyn Write, list: &TodoList, only: Option<Status>) -> io:
     list.each_index(|index| {
         let todo = &list[index];
         if result.is_ok() && only.is_none_or(|status| status == todo.status) {
-            result = writeln!(out, "{:>2}. {}", index + 1, todo.line());
+            result = writeln!(out, "{:>2}. {}", list.position(index), todo.line());
         }
     });
     result?;

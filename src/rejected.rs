@@ -126,3 +126,9 @@ fn a_status_reported_unequal_to_itself(status: Status) -> bool {
 fn status_slot_claimed_to_fit_two_slots(todo: &Todo) -> Option<usize> {
     Some(todo.status.slot())
 }
+
+#[should_fail]
+#[spec(fn[hrn p: int -> bool](a: u8{p(a)}, b: u8{p(b)}) -> u8{v: p(v)})]
+fn sum_claimed_to_keep_any_property(a: u8, b: u8) -> u8 {
+    a / 2 + b / 2
+}
