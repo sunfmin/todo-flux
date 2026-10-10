@@ -24,6 +24,12 @@ fn index_reused_after_remove(mut list: TodoList, pos: usize) {
 }
 
 #[should_fail]
+#[spec(fn(&TodoList[@n], pos: usize{1 <= pos && pos <= n}) -> usize[pos])]
+fn locate_mistaken_for_identity(list: &TodoList, pos: usize) -> usize {
+    list.locate(pos).unwrap()
+}
+
+#[should_fail]
 fn priority_taken_from_raw_number(list: &mut TodoList, n: u8) {
     if let Some(index) = list.locate(1) {
         list.set_priority(index, n);
