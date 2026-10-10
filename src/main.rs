@@ -32,7 +32,7 @@ usage: todo [list]          show all todos
        todo undo <n>        mark todo n as open again
        todo pri <n> <1-3>   set the priority of todo n (1 is highest)
        todo mv <n> <m>      move todo n to position m
-       todo rm <n>..        delete the todos numbered
+       todo rm <n|n-m>..    delete the todos numbered; 2-4 means 2, 3 and 4
        todo clear           delete every done todo
 
 Todos are stored in $TODO_FILE (default: ~/.todo.txt).";
@@ -179,9 +179,11 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
         ("mv", [n, m]) => Ok(Command::Move(index_of(list, n)?, index_of(list, m)?)),
         ("rm", numbers) if !numbers.is_empty() => {
             let mut picks = Picks::none();
-            for n in numbers {
-                if !picks.pick(index_of(list, n)?) {
-                    return Err(format!("todo {n} is named twice"));
+            for numbers in numbers {
+                for index in indexes_of(list, numbers)? {
+                    if !picks.pick(index) {
+                        return Err(format!("todo {} is named twice", list.position(index)));
+                    }
                 }
             }
             Ok(Command::Remove(picks))
@@ -219,6 +221,41 @@ fn index_of(list: &TodoList, arg: &str) -> Result<usize, String> {
         Some(index) => Ok(index),
         None => Err(format!("no todo {pos} (the list has {})", list.len())),
     }
+}
+
+/// The indexes an argument of `rm` names: one todo number, or a range of
+/// them written `2-4`.
+#[spec(fn(&TodoList[@n], _) -> Result<Vec<usize{i: i < n}>, _>)]
+fn indexes_of(list: &TodoList, arg: &str) -> Result<Vec<usize>, String> {
+    let (first, last) = match arg.split_once('-') {
+        Some((first, last)) if !first.is_empty() => (first, last),
+        _ => (arg, arg),
+    };
+    let first = index_of(list, first)?;
+    let last = index_of(list, last)?;
+    if first > last {
+        return Err(format!("the range {arg} runs backwards"));
+    }
+    Ok(span(first, last))
+}
+
+/// The indexes from `first` to `last`, both included: every one between
+/// them and exactly as many as that, so a range is never one short or one
+/// over.
+// The loop's invariant, how many indexes are collected so far, has the same
+// shape as the length the spec promises. Scraping lets Flux try the shapes
+// it sees in the specs, and so find it.
+#[opts(scrape_quals = "true")]
+#[spec(fn(first: usize, last: usize{first <= last}) -> Vec<usize{i: first <= i && i <= last}>[last - first + 1])]
+fn span(first: usize, last: usize) -> Vec<usize> {
+    let mut indexes = Vec::new();
+    let mut index = first;
+    while index < last {
+        indexes.push(index);
+        index += 1;
+    }
+    indexes.push(last);
+    indexes
 }
 
 #[spec(fn(_) -> Result<Priority, _>)]

@@ -210,3 +210,9 @@ fn any_selection_claimed_to_hold_everything<S: Selection>(selection: &S, by: S::
 fn percent_bound_claimed_without_what_times_and_divide_compute(progress: &Progress) -> usize {
     (progress.done as u128 * 100 / progress.total as u128) as usize
 }
+
+#[should_fail]
+#[spec(fn(first: usize, last: usize{first <= last}) -> Vec<usize>[last - first])]
+fn range_that_leaves_out_its_last_number(first: usize, last: usize) -> Vec<usize> {
+    crate::span(first, last)
+}
