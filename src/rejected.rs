@@ -10,7 +10,7 @@ use flux_rs::{attrs::*, defs};
 
 use crate::{
     Command,
-    list::{Picks, Priority, Progress, Status, StatusSet, Title, Todo, TodoList},
+    list::{Picks, Priority, Progress, Selection, Status, StatusSet, Title, Todo, TodoList},
 };
 
 defs! {
@@ -193,4 +193,10 @@ fn index_from_walking_one_slice_used_on_another(walked: &[Todo], other: &[Todo])
     for (index, _) in walked.iter().enumerate() {
         let _ = &other[index];
     }
+}
+
+#[should_fail]
+#[spec(fn(&S, S::By) -> bool[true])]
+fn any_selection_claimed_to_hold_everything<S: Selection>(selection: &S, by: S::By) -> bool {
+    selection.has(by)
 }
