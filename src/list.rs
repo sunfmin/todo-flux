@@ -4,7 +4,7 @@
 //! `get`, `set_done` or `remove` is proved in bounds at compile time. The
 //! only way to obtain such an index from untrusted input is `locate`.
 
-use flux_rs::{attrs::*, macros::invariant};
+use flux_rs::{attrs::*, defs, macros::invariant};
 
 const DONE_MARK: &str = "[x] ";
 const OPEN_MARK: &str = "[ ] ";
@@ -14,15 +14,22 @@ pub const HIGHEST_PRIORITY: u8 = 1;
 pub const LOWEST_PRIORITY: u8 = 3;
 const DEFAULT_PRIORITY: Priority = 2;
 
+// The rules of this module, named once and used by the specs below.
+defs! {
+    fn is_priority(p: int) -> bool { HIGHEST_PRIORITY <= p && p <= LOWEST_PRIORITY }
+    fn is_position(pos: int, len: int) -> bool { 1 <= pos && pos <= len }
+}
+
 /// How urgent a todo is. Flux only lets a value in the valid range have this
 /// type, so the only way to make one from an arbitrary number is `priority`.
-#[alias(type Priority = u8{p: HIGHEST_PRIORITY <= p && p <= LOWEST_PRIORITY})]
+#[alias(type Priority = u8{p: is_priority(p)})]
 pub type Priority = u8;
 
-/// Checks a number typed by a user (or found in a file) against the range.
+/// Checks a number typed by a user (or found in a file) against the range:
+/// `Some` exactly when it is a priority, and then the same number.
 // Flux reasons about the comparisons; it has no spec for `RangeInclusive::contains`.
 #[allow(clippy::manual_range_contains)]
-#[spec(fn(n: u8) -> Option<Priority>)]
+#[spec(fn(n: u8) -> Option<u8[n]>[is_priority(n)])]
 pub fn priority(n: u8) -> Option<Priority> {
     if HIGHEST_PRIORITY <= n && n <= LOWEST_PRIORITY {
         Some(n)
@@ -146,9 +153,9 @@ impl TodoList {
         });
     }
 
-    /// Turns the 1-based position a user types into a proved-valid index,
-    /// or `None` when no todo sits at that position.
-    #[spec(fn(&TodoList[@n], pos: usize) -> Option<usize{i: i < n}>)]
+    /// Turns the 1-based position a user types into its index: `Some` exactly
+    /// when a todo sits at that position, and then the index just before it.
+    #[spec(fn(&TodoList[@n], pos: usize) -> Option<usize[pos - 1]>[is_position(pos, n)])]
     pub fn locate(&self, pos: usize) -> Option<usize> {
         if 1 <= pos && pos <= self.len() {
             Some(pos - 1)

@@ -122,12 +122,14 @@ fn index_of(list: &TodoList, arg: &str) -> Result<usize, String> {
 
 #[spec(fn(&str) -> Result<Priority, String>)]
 fn priority_of(arg: &str) -> Result<Priority, String> {
-    match arg.parse().ok().and_then(priority) {
-        Some(priority) => Ok(priority),
-        None => Err(format!(
-            "priority must be {HIGHEST_PRIORITY} to {LOWEST_PRIORITY}, not '{arg}'"
-        )),
+    if let Ok(n) = arg.parse()
+        && let Some(priority) = priority(n)
+    {
+        return Ok(priority);
     }
+    Err(format!(
+        "priority must be {HIGHEST_PRIORITY} to {LOWEST_PRIORITY}, not '{arg}'"
+    ))
 }
 
 fn print_list(list: &TodoList) {
