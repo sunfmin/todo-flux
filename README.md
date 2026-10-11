@@ -8,6 +8,7 @@ program on purpose: each part of it shows one thing Flux can do.
 todo [list]          show all todos
 todo list <status>.. show only open, doing or done todos
 todo next            show the most urgent todo that is not done
+todo now             show the todo being worked on
 todo add <title>     add a todo
 todo start <n>       mark todo n as being worked on
 todo done <n>        mark todo n as done
@@ -36,7 +37,7 @@ a runtime panic or a silently wrong file.
 | Reflected enums, structs indexed by them | A status changes only as the rules allow: a done todo must be reopened before it is started again | `Status`, `Todo::try_become` |
 | Record update syntax in specs | Changing a todo's status leaves its priority alone, and the other way round | `Todo::try_become`, `Todo::set_priority` |
 | Enums with refined variants, enum invariants | A parsed command fits the list it was parsed against, so running it needs no checks | `Command`, `parse` |
-| Refined arrays, const generics, refined function pointers | One counting loop serves any number of slots, and every todo lands in a slot that exists | `TodoList::tally` |
+| Refined arrays, const generics, refined function pointers | One counting loop serves any number of slots, and every todo lands in a slot that exists; a share is never more than the whole its type names | `TodoList::tally`, `Share` |
 | Refined closure signatures | The loop that hands indexes to a closure only hands out valid ones | `TodoList::each_index` |
 | `for` loops over ranges | Loop variables stay in range, with nothing written by hand | `TodoList::progress` |
 | `invariant!` | Counting the digits of the largest todo number cannot overflow | `number_width` |
@@ -55,14 +56,15 @@ a runtime panic or a silently wrong file.
 | Uninterpreted functions | A text makes a title exactly when it is not blank, whatever "blank" computes | `blank`, `Title::new` |
 | Hidden and revealed definitions | Other proofs rely on the status rule holding, not on what it says | `can_become` |
 | `forall` preconditions, bounded quantifiers | Theorems: no status is a dead end; no priority slot is spare | `status_theorems` |
-| Generic (abstract) refinements | The smaller of two priorities is a priority, said once for every type | `cmp_specs` |
-| Extern specs: a struct and its methods, a free function, a primitive type, a trait | What `BTreeSet`, `std::cmp::min`, `char::to_digit` and `Default` promise; a todo starts open | `set_specs`, `cmp_specs`, `char_specs`, `default_specs` |
+| Generic (abstract) refinements | The more urgent of two priorities is a priority, from a spec that never mentions priorities: whatever both numbers satisfy, the answer does | `more_urgent`, `TodoList::most_urgent_left` |
+| Extern specs: a struct and its methods, a free function, a primitive type, a trait | What `BTreeSet`, `std::cmp::max`, `char::to_digit` and `Default` promise; a todo starts open | `set_specs`, `cmp_specs`, `char_specs`, `default_specs` |
 | Include patterns | The refined vector's file is the trusted base, named once | `Cargo.toml` (`include_trusted`) |
 | A refined vector (`RVec`) | Reading a todo at a proved index cannot panic | `src/rvec.rs` |
-| Detached specs, `trusted_derive` | `==` on statuses is true exactly for equal statuses | `Status` |
+| Detached specs, `trusted_derive` | Specs stated beside the code and not on it: for a derived `==` (trait impl), a function, an enum, a struct and its impl, a trait | `Status`, `indexes_of`, `Numbers`, `StatusSet`, `Choice` |
 | Opaque structs, trusted functions | A title is never blank | `Title`, `RVec` |
 | Type holes (`_`) in signatures, fields, variants and aliases | A spec names only the part it is about | `split_priority`, `parse`, `Picks`, `Command`, `Removed` |
-| Refined `impl Trait` and `dyn Trait` | Every priority an iterator yields is a priority; output goes to any writer | `priorities`, `run` |
+| Refined `impl Trait` | Every priority an iterator yields is a priority | `priorities` |
+| Refined `dyn Trait` | `next` and `now` choose a todo through a trait object, and the index that comes back is proved to be in the list | `Choice` |
 | `ignore` | The one function with no rule to check is left out | `main` |
 | Overflow checking (`strict`, whole crate; `opts` for one function) | No arithmetic overflows or underflows, no division by zero | `Cargo.toml` |
 | `no_panic` | The rule functions cannot panic on any input | `src/list.rs` |
@@ -84,15 +86,37 @@ a runtime panic or a silently wrong file.
 
 The table follows the sections of the
 [specifications guide](https://flux-rs.github.io/flux/guide/specifications.html);
-each has a use in the code. Some uses are small, and it is fair to say so:
+each has a use in the code, and a proof that rests on that use.
+`mutants.py` is the check. It first reads the guide itself, at the Flux
+revision `Cargo.toml` pins, and requires every heading and named sub-item
+in it to have a mutant, or to be listed in `NOT_REFLECTED` with the reason:
+98 sections, 6 of them with nothing to reflect (three example programs, a
+remark, a restriction, and a part the guide leaves as TODO). Then for every section it breaks the one line that uses the
+capability, runs Flux, and expects the program to be rejected. A
+line that can be broken without Flux noticing is doing no work, and a line
+that is gone is reported too, so a refactor cannot quietly drop a
+capability.
 
+```
+uv run mutants.py             # the sections, then all 86 mutants: about six minutes
+uv run mutants.py Sets        # only the sections whose name contains "Sets"
+uv run mutants.py --sections  # only the comparison with the guide, one second
+```
+
+Three things it is fair to say about what that shows:
+
+- Flux proves at compile time. The theorems (`status_theorems`,
+  `status_set_theorems`, `picks_theorems`, `title_theorems`) and the
+  rejected examples in `src/rejected.rs` are compiled only under Flux; the
+  program does not call them, and does not need to.
 - `uif_ops` can only take knowledge away from the solver, so it proves
-  nothing new here. It shows which proofs depend on arithmetic.
-- The theorems (`status_theorems`, `status_set_theorems`, `picks_theorems`,
-  `title_theorems`) are compiled only under Flux. They state rules; the
-  program does not call them.
-- Include patterns also work from the command line: `./verify.sh remove_all`
-  checks only the functions whose path contains that name.
+  nothing new. It shows which proofs depend on arithmetic.
+- Removing `#[flux_rs::ignore]` from `main` breaks nothing, since Flux can
+  check `main`. That mutant is caught by Flux's count of ignored functions
+  instead.
+
+Include patterns also work from the command line: `./verify.sh remove_all`
+checks only the functions whose path contains that name.
 
 ## Build, test, verify
 

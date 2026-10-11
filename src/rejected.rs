@@ -63,7 +63,7 @@ fn done_mistaken_for_length(list: &TodoList) -> usize {
 
 #[should_fail]
 fn percent_of_empty_list() -> usize {
-    TodoList::new().progress().percent()
+    TodoList::new().progress().percent().part
 }
 
 #[should_fail]
@@ -184,8 +184,11 @@ fn removal_claimed_to_keep_the_list_whole(list: &mut TodoList, picks: &Picks) {
 
 #[should_fail]
 #[spec(fn(Priority, u8) -> Priority)]
-fn smaller_of_a_priority_and_any_number_claimed_a_priority(priority: Priority, n: u8) -> Priority {
-    std::cmp::min(priority, n)
+fn more_urgent_of_a_priority_and_any_number_claimed_a_priority(
+    priority: Priority,
+    n: u8,
+) -> Priority {
+    crate::list::more_urgent(priority, n)
 }
 
 #[should_fail]
@@ -236,4 +239,33 @@ fn a_new_todo_claimed_to_start_done() -> Status {
 #[spec(fn() -> T{value: false})]
 fn every_default_claimed_impossible<T: Default>() -> T {
     T::default()
+}
+
+#[should_fail]
+fn todo_chosen_from_one_list_read_from_another(
+    choice: &dyn crate::list::Choice,
+    list: &TodoList,
+    other: &TodoList,
+) {
+    if let Some(index) = choice.of(list) {
+        let _ = &other[index];
+    }
+}
+
+// True by the rule as it is written, but the rule is hidden: without
+// `reveal`, Flux knows that it is a rule and not what it says.
+#[should_fail]
+#[spec(fn() -> bool[can_become(Status::Open, Status::Done)])]
+fn hidden_rule_read_without_revealing_it() -> bool {
+    true
+}
+
+#[should_fail]
+fn run_of_todos_built_backwards() -> crate::Numbers {
+    crate::Numbers::Run(3, 2)
+}
+
+#[should_fail]
+fn share_larger_than_the_whole() -> crate::list::Share<10> {
+    crate::list::Share { part: 11 }
 }

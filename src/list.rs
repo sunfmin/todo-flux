@@ -4,7 +4,7 @@
 //! indexing, `set_status` or `move_to` is proved in bounds at compile time. The
 //! only way to obtain such an index from untrusted input is `locate`.
 
-use std::{cmp::min, collections::BTreeSet, ops::Index};
+use std::{collections::BTreeSet, ops::Index};
 
 use flux_rs::{attrs::*, bitvec::BV32, defs, macros::qualifier};
 
@@ -45,6 +45,11 @@ defs! {
     // The number a digit character stands for. `cast` turns the character
     // into its code so the spec can do arithmetic on it.
     fn digit_value(c: char) -> int { cast(c) - cast('0') }
+    // The characters a priority is written with, said by their codes: those
+    // from the digit of the highest priority to the digit of the lowest.
+    fn is_priority_digit(c: char) -> bool {
+        cast('0') + HIGHEST_PRIORITY <= cast(c) && cast(c) <= cast('0') + LOWEST_PRIORITY
+    }
     // Whether nothing is left of a text once it is trimmed. It has no body:
     // Flux cannot look inside a string, so all it knows is that this is a
     // function, giving the same answer for the same text every time.
@@ -172,6 +177,21 @@ mod default_specs {
     }
 }
 
+/// The value that was found, or else the one its type starts from. Written
+/// for any type with a default, so all Flux knows of that default here is
+/// what the spec of the `Default` trait says.
+#[expect(
+    clippy::manual_unwrap_or_default,
+    reason = "std's `unwrap_or_default` has no spec, so Flux would learn nothing from it"
+)]
+#[spec(fn(Option<T>[@found]) -> T{value: !found => <T as Default>::is_default(value)})]
+fn or_default<T: Default>(found: Option<T>) -> T {
+    match found {
+        Some(value) => value,
+        None => T::default(),
+    }
+}
+
 /// A todo starts open: on `add`, and when a line in the file has no mark.
 #[assoc(fn is_default(status: Status) -> bool { status == Status::Open })]
 impl Default for Status {
@@ -201,8 +221,10 @@ pub fn priority(n: u8) -> Option<Priority> {
 }
 
 /// Reads the one character that stands for a priority in the text format:
-/// `Some` exactly when it is the digit of a priority, and then that number.
-#[spec(fn(char[@c]) -> Option<u8[digit_value(c)]>[is_priority(digit_value(c))])]
+/// `Some` exactly when it is one of the characters a priority is written
+/// with, and then the number that digit stands for. That the two agree,
+/// characters on one side and numbers on the other, is what Flux proves.
+#[spec(fn(char[@c]) -> Option<u8[digit_value(c)]>[is_priority_digit(c)])]
 fn priority_digit(c: char) -> Option<Priority> {
     match c.to_digit(10) {
         Some(n) => priority(n as u8),
@@ -285,32 +307,42 @@ mod title_theorems {
 /// A set of statuses, kept as one bit per status. Flux reasons about the
 /// bits themselves: a set never holds a bit that is not a status.
 #[derive(Clone, Copy)]
-#[refined_by(bits: bitvec<32>)]
-#[invariant(only_status_bits(bits))]
 pub struct StatusSet {
-    #[field({BV32[bits] | only_status_bits(bits)})]
     bits: BV32,
 }
 
+// What a `StatusSet` is to Flux and what its functions do to the bits,
+// detached from the struct and its impl, which stay plain Rust.
+#[specs {
+    #[refined_by(bits: bitvec<32>)]
+    #[invariant(only_status_bits(bits))]
+    struct StatusSet {
+        bits: {BV32[bits] | only_status_bits(bits)},
+    }
+    impl StatusSet {
+        fn none() -> StatusSet[0];
+        fn with(set: StatusSet[@bits], status: Status) -> StatusSet[bits | bit_of(status)];
+        fn contains(set: &StatusSet[@bits], status: Status) -> bool[bits & bit_of(status) != 0];
+        fn all() -> StatusSet[STATUS_BITS];
+    }
+}]
+const _: () = ();
+
 impl StatusSet {
-    #[spec(fn() -> StatusSet[0])]
     pub fn none() -> StatusSet {
         StatusSet { bits: BV32::new(0) }
     }
 
-    #[spec(fn(StatusSet[@bits], Status[@status]) -> StatusSet[bits | bit_of(status)])]
     pub fn with(self, status: Status) -> StatusSet {
         StatusSet {
             bits: self.bits | status.bit(),
         }
     }
 
-    #[spec(fn(&StatusSet[@bits], Status[@status]) -> bool[bits & bit_of(status) != 0])]
     pub fn contains(&self, status: Status) -> bool {
         self.bits & status.bit() != 0
     }
 
-    #[spec(fn() -> StatusSet[STATUS_BITS])]
     pub fn all() -> StatusSet {
         StatusSet { bits: STATUS_BITS }
     }
@@ -360,17 +392,26 @@ mod status_set_theorems {
     }
 }
 
-/// What std's `min` keeps. The spec is generic in what is known about the
-/// two values: whatever property `p` both have, the result has too, so the
-/// smaller of two priorities is a priority and nothing here mentions
-/// priorities. Only Flux reads this.
+/// The more urgent of two priorities. The spec is generic in what is known
+/// about the two numbers: whatever property `p` both have, the answer has
+/// too, besides being no larger than either. So the more urgent of two
+/// priorities is a priority, and nothing here mentions priorities.
+#[spec(fn[hrn p: int -> bool](a: u8{p(a)}, b: u8{p(b)}) -> u8{v: p(v) && v <= a && v <= b})]
+pub fn more_urgent(a: u8, b: u8) -> u8 {
+    if a < b { a } else { b }
+}
+
+/// What std's `max` gives. Only Flux reads this.
 #[cfg(flux)]
 mod cmp_specs {
     use flux_rs::attrs::*;
 
+    // The larger of two values is what their type's `Ord` says it is. For
+    // `usize` that is the larger number exactly, so a caller knows it is no
+    // less than either argument.
     #[extern_spec(std::cmp)]
-    #[spec(fn[hrn p: T -> bool](T{v: p(v)}, T{v: p(v)}) -> T{v: p(v)})]
-    fn min<T: Ord>(a: T, b: T) -> T;
+    #[spec(fn(T[@a], T[@b]) -> T{v: <T as Ord>::max_res(a, b, v)})]
+    fn max<T: Ord>(a: T, b: T) -> T;
 }
 
 /// Every priority, most urgent first. Whatever the iterator is made of, each
@@ -423,11 +464,11 @@ mod status_theorems {
         && (mark_of(s) == mark_of(Status::Done) => s == Status::Done))]
     fn marks_tell_statuses_apart() {}
 
-    /// The status a todo starts in is open, known from the spec of the
-    /// `Default` trait alone.
+    /// A line with no mark on it loads as an open todo, known from the spec
+    /// of the `Default` trait alone.
     #[spec(fn() -> Status{s: s == Status::Open})]
-    fn a_new_todo_is_open() -> Status {
-        Status::default()
+    fn a_line_without_a_mark_is_open() -> Status {
+        super::or_default(None)
     }
 
     #[reveal(can_become)]
@@ -471,18 +512,18 @@ impl Todo {
     /// priority means the default, so any hand-edited file still loads. A
     /// line with no title on it is not a todo.
     fn from_line(line: &str) -> Option<Todo> {
-        let mut status = Status::default();
+        let mut marked = None;
         let mut rest = line;
         for candidate in Status::ALL {
             if let Some(after_mark) = line.strip_prefix(candidate.mark()) {
-                status = candidate;
+                marked = Some(candidate);
                 rest = after_mark;
             }
         }
         let (priority, title) = split_priority(rest);
         Some(Todo {
             title: Title::new(title)?,
-            status,
+            status: or_default(marked),
             priority,
         })
     }
@@ -714,12 +755,27 @@ impl Progress {
 
     /// The done share as a whole percentage. There is no share of nothing,
     /// so the caller must have at least one todo.
-    #[spec(fn(&Progress[@p]) -> usize{v: v <= 100} requires p.total > 0)]
+    #[spec(fn(&Progress[@p]) -> Percent requires p.total > 0)]
     #[no_panic]
-    pub fn percent(&self) -> usize {
+    pub fn percent(&self) -> Percent {
         // In u128 the product cannot overflow, however long the list is.
-        (self.done as u128 * 100 / self.total as u128) as usize
+        Share {
+            part: (self.done as u128 * 100 / self.total as u128) as usize,
+        }
     }
+}
+
+pub type Percent = Share<100>;
+
+/// A part of a whole that is counted in `OUT_OF` pieces, and never more
+/// than all of them: a percentage is a `Share<100>`. The bound is the
+/// type's own parameter, so it is written once, where the share is named.
+/// A whole has at least one piece.
+#[refined_by(part: int)]
+#[invariant(OUT_OF > 0)]
+pub struct Share<const OUT_OF: usize> {
+    #[field({usize[part] | part <= OUT_OF})]
+    pub part: usize,
 }
 
 /// The todos a removal took out, in the order they had. The alias carries
@@ -855,22 +911,39 @@ impl TodoList {
         self.items.as_slice()
     }
 
-    /// The todo to work on next: the first one not done among those of the
-    /// most urgent priority that has any, or `None` when everything is done.
-    #[spec(fn(&TodoList[@n]) -> Option<usize{i: i < n}>)]
-    pub fn next(&self) -> Option<usize> {
-        let mut most_urgent: Option<Priority> = None;
+    /// The most urgent priority any todo not done has.
+    #[spec(fn(&TodoList) -> Option<Priority>)]
+    fn most_urgent_left(&self) -> Option<Priority> {
+        let mut most_urgent = None;
         for todo in self.todos().iter() {
             if !todo.status.is_done() {
                 most_urgent = Some(match most_urgent {
-                    Some(priority) => min(priority, todo.priority),
+                    Some(priority) => more_urgent(priority, todo.priority),
                     None => todo.priority,
                 });
             }
         }
-        let wanted = most_urgent?;
+        most_urgent
+    }
+
+    /// The todo to work on next: the first one not done among those of the
+    /// most urgent priority that has any, or `None` when everything is done.
+    #[spec(fn(&TodoList[@n]) -> Option<usize{i: i < n}>)]
+    pub fn next(&self) -> Option<usize> {
+        let wanted = self.most_urgent_left()?;
         for (i, todo) in self.todos().iter().enumerate() {
             if !todo.status.is_done() && todo.priority == wanted {
+                return Some(i);
+            }
+        }
+        None
+    }
+
+    /// The first todo being worked on, or `None` when none is.
+    #[spec(fn(&TodoList[@n]) -> Option<usize{i: i < n}>)]
+    fn first_doing(&self) -> Option<usize> {
+        for (i, todo) in self.todos().iter().enumerate() {
+            if todo.status == Status::Doing {
                 return Some(i);
             }
         }
@@ -932,6 +1005,58 @@ impl TodoList {
     #[spec(fn(self: &mut TodoList[@n], Todo) ensures self: TodoList[n + 1])]
     fn push(&mut self, todo: Todo) {
         self.items.push(todo);
+    }
+}
+
+/// A way to single one todo out of a list. The caller holds it as a trait
+/// object and so cannot know which way it is: the spec on the trait method is
+/// all Flux has to go on at the call, and it is enough to index the list
+/// with the answer. Every implementation is checked against that spec.
+pub trait Choice {
+    fn of(&self, list: &TodoList) -> Option<usize>;
+
+    /// What to tell the user when no todo is chosen.
+    fn none(&self) -> &'static str;
+}
+
+// The one promise every choice makes, said for the trait and for each way
+// of choosing in one place, detached from the code it is about.
+#[specs {
+    trait Choice {
+        fn of(&Self, list: &TodoList[@n]) -> Option<usize{i: i < n}>;
+    }
+    impl Choice for MostUrgent {
+        fn of(&Self, list: &TodoList[@n]) -> Option<usize{i: i < n}>;
+    }
+    impl Choice for InProgress {
+        fn of(&Self, list: &TodoList[@n]) -> Option<usize{i: i < n}>;
+    }
+}]
+const _: () = ();
+
+/// The todo `TodoList::next` names.
+pub struct MostUrgent;
+
+impl Choice for MostUrgent {
+    fn of(&self, list: &TodoList) -> Option<usize> {
+        list.next()
+    }
+
+    fn none(&self) -> &'static str {
+        "nothing to do"
+    }
+}
+
+/// The first todo being worked on.
+pub struct InProgress;
+
+impl Choice for InProgress {
+    fn of(&self, list: &TodoList) -> Option<usize> {
+        list.first_doing()
+    }
+
+    fn none(&self) -> &'static str {
+        "nothing in progress"
     }
 }
 

@@ -12,6 +12,7 @@ mod rejected;
 mod rvec;
 
 use std::{
+    cmp::max,
     env, fs,
     io::{self, Write},
     path::PathBuf,
@@ -20,14 +21,15 @@ use std::{
 
 use flux_rs::{attrs::*, defs, macros::invariant};
 use list::{
-    HIGHEST_PRIORITY, LOWEST_PRIORITY, Picks, Priority, Removed, Status, StatusSet, Title,
-    TodoList, priorities, priority, slot,
+    Choice, HIGHEST_PRIORITY, InProgress, LOWEST_PRIORITY, MostUrgent, Picks, Priority, Removed,
+    Status, StatusSet, Title, TodoList, priorities, priority, slot,
 };
 
 const USAGE: &str = "\
 usage: todo [list]          show all todos
        todo list <status>.. show only open, doing or done todos
        todo next            show the most urgent todo that is not done
+       todo now             show the todo being worked on
        todo add <title>     add a todo
        todo start <n>       mark todo n as being worked on
        todo done <n>        mark todo n as done
@@ -57,6 +59,18 @@ defs! {
     use crate::list::need_with;
 }
 
+// What the arguments of `rm` are read into, said here and not on the enum
+// and the function: detached specs, the same promises from outside the code.
+#[specs {
+    #[refined_by(need: int)]
+    enum Numbers {
+        One(usize[@index]) -> Numbers[index + 1],
+        Run(usize[@first], {usize[@last] | first <= last}) -> Numbers[last + 1],
+    }
+    fn indexes_of(list: &TodoList[@n], arg: &str) -> Result<Vec<usize{i: i < n}>, String>;
+}]
+const _: () = ();
+
 /// What the user asked for, with every todo number already turned into an
 /// index. The refinement `need` is the shortest list the command can run on,
 /// so a command that `parse` checked against a list runs on it with no
@@ -69,8 +83,8 @@ enum Command {
     List(StatusSet),
     #[variant(Command[0])]
     Help,
-    #[variant(Command[0])]
-    Next,
+    #[variant((_) -> Command[0])]
+    Show(&'static dyn Choice),
     #[variant((_) -> Command[0])]
     Add(Title),
     #[variant((usize[@index], Status) -> Command[index + 1])]
@@ -107,8 +121,8 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
         Command::Help => {
             return written(writeln!(out, "{USAGE}"));
         }
-        Command::Next => {
-            return written(match list.next() {
+        Command::Show(choice) => {
+            return written(match choice.of(&list) {
                 Some(index) => writeln!(
                     out,
                     "{:>width$}. {}",
@@ -116,7 +130,7 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
                     list[index].line(),
                     width = number_width(list.len())
                 ),
-                None => writeln!(out, "nothing to do"),
+                None => writeln!(out, "{}", choice.none()),
             });
         }
         Command::Add(title) => list.add(title),
@@ -166,7 +180,8 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
         }
         ("clear", []) => Ok(Command::Clear),
         ("help" | "-h" | "--help", _) => Ok(Command::Help),
-        ("next", []) => Ok(Command::Next),
+        ("next", []) => Ok(Command::Show(&MostUrgent)),
+        ("now", []) => Ok(Command::Show(&InProgress)),
         ("add", words) => match Title::new(&words.join(" ")) {
             Some(title) => Ok(Command::Add(title)),
             None => Err("add needs a title".to_string()),
@@ -227,18 +242,37 @@ fn index_of(list: &TodoList, arg: &str) -> Result<usize, String> {
 
 /// The indexes an argument of `rm` names: one todo number, or a range of
 /// them written `2-4`.
-#[spec(fn(&TodoList[@n], _) -> Result<Vec<usize{i: i < n}>, _>)]
 fn indexes_of(list: &TodoList, arg: &str) -> Result<Vec<usize>, String> {
-    let (first, last) = match arg.split_once('-') {
-        Some((first, last)) if !first.is_empty() => (first, last),
-        _ => (arg, arg),
+    let numbers = match arg.split_once('-') {
+        Some((first, last)) if !first.is_empty() => {
+            let first = index_of(list, first)?;
+            let last = index_of(list, last)?;
+            if first > last {
+                return Err(format!("the range {arg} runs backwards"));
+            }
+            Numbers::Run(first, last)
+        }
+        _ => Numbers::One(index_of(list, arg)?),
     };
-    let first = index_of(list, first)?;
-    let last = index_of(list, last)?;
-    if first > last {
-        return Err(format!("the range {arg} runs backwards"));
+    Ok(numbers.indexes())
+}
+
+/// What one argument of `rm` names: one todo, or a run of them from a first
+/// to a last. A run that ends before it starts cannot be built, and `need`
+/// is the shortest list all the todos named are in.
+enum Numbers {
+    One(usize),
+    Run(usize, usize),
+}
+
+impl Numbers {
+    #[spec(fn(Numbers[@need]) -> Vec<usize{i: i < need}>)]
+    fn indexes(self) -> Vec<usize> {
+        match self {
+            Numbers::One(index) => span(index, index),
+            Numbers::Run(first, last) => span(first, last),
+        }
     }
-    Ok(span(first, last))
 }
 
 /// The indexes from `first` to `last`, both included: every one between
@@ -293,7 +327,7 @@ fn number_width(total: usize) -> usize {
         rest /= 10;
         width += 1;
     }
-    if width < 2 { 2 } else { width }
+    max(width, 2)
 }
 
 fn print_removed(out: &mut dyn Write, removed: Removed) -> io::Result<()> {
@@ -324,7 +358,7 @@ fn print_list(out: &mut dyn Write, list: &TodoList, only: StatusSet) -> io::Resu
         out,
         "{}/{total} done ({}%), {} left, {} doing",
         progress.done,
-        progress.percent(),
+        progress.percent().part,
         progress.left(),
         list.by_status()[Status::Doing.slot()]
     )?;
