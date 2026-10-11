@@ -171,6 +171,18 @@ fn priority_change_that_also_reopens_the_todo(todo: &mut Todo, priority: Priorit
 }
 
 #[should_fail]
+#[spec(fn(&Todo[@t]) -> Todo[t])]
+fn copy_claimed_to_keep_the_status(todo: &Todo) -> Todo {
+    todo.open_copy()
+}
+
+#[should_fail]
+#[spec(fn(list: &mut TodoList[@n], usize{i: i < n}) ensures list: TodoList[n])]
+fn copying_claimed_to_keep_the_length(list: &mut TodoList, index: usize) {
+    list.duplicate(index);
+}
+
+#[should_fail]
 #[spec(fn(&Command[@c]) -> bool[c.need > 0])]
 fn every_command_claimed_to_need_a_todo(_command: &Command) -> bool {
     true

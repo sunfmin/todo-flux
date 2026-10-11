@@ -284,6 +284,42 @@ fn swap_exchanges_two_todos_and_leaves_the_rest() {
 }
 
 #[test]
+fn dup_adds_an_open_copy_right_after_the_todo() {
+    let cli = Cli::new("dup");
+    for title in ["a", "b", "c"] {
+        cli.ok(&["add", title]);
+    }
+    cli.ok(&["pri", "2", "1"]);
+    cli.ok(&["dup", "2"]);
+    assert_eq!(cli.stored(), "[ ] !2 a\n[ ] !1 b\n[ ] !1 b\n[ ] !2 c\n");
+
+    cli.ok(&["done", "4"]);
+    cli.ok(&["start", "1"]);
+    cli.ok(&["dup", "4"]);
+    cli.ok(&["dup", "1"]);
+    assert_eq!(
+        cli.stored(),
+        "[~] !2 a\n[ ] !2 a\n[ ] !1 b\n[ ] !1 b\n[x] !2 c\n[ ] !2 c\n"
+    );
+
+    let before = cli.stored();
+    assert_eq!(
+        String::from_utf8_lossy(&cli.run(&["dup", "7"]).stderr),
+        String::from_utf8_lossy(&cli.run(&["mv", "7", "1"]).stderr)
+    );
+    for args in [
+        &["dup", "0"][..],
+        &["dup", "7"],
+        &["dup", "x"],
+        &["dup"],
+        &["dup", "1", "2"],
+    ] {
+        assert!(!cli.run(args).status.success(), "{args:?}");
+    }
+    assert_eq!(cli.stored(), before);
+}
+
+#[test]
 fn rm_takes_several_numbers_but_none_twice() {
     let cli = Cli::new("rm-several");
     for title in ["a", "b", "c", "d"] {

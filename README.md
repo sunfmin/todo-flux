@@ -17,6 +17,7 @@ todo undo <n>           mark todo n as open again
 todo pri <n> <1-3>      set the priority of todo n (1 is highest)
 todo mv <n> <m>         move todo n to position m
 todo swap <n> <m>       exchange todos n and m
+todo dup <n>            add a copy of todo n right after it
 todo rm <n|n-m>..       delete the todos numbered; 2-4 means 2, 3 and 4
 todo clear              delete every done todo
 todo count              show how many todos are open, doing and done
@@ -33,12 +34,12 @@ a runtime panic or a silently wrong file.
 
 | Flux capability | Rule it proves here | Where |
 |---|---|---|
-| Indexed types, strong references (`ensures`) | An index is below the list's length; `add` changes the length by exactly +1, `mv` and `swap` by 0 | `TodoList` |
+| Indexed types, strong references (`ensures`) | An index is below the list's length; `add` and `dup` change the length by exactly +1, `mv` and `swap` by 0 | `TodoList` |
 | Existential types, type aliases, constants | A priority is always 1 to 3 | `Priority`, `priority` |
 | Spec functions (`defs!`), `let` binders | `locate` and `priority` return `Some` exactly when the input is valid, and exactly the right value | `is_position`, `is_priority`, `need_with` |
 | Struct invariants | There are never more done todos than todos, so "left" and "percent" are safe arithmetic | `Progress` |
 | Reflected enums, structs indexed by them | A status changes only as the rules allow: a done todo must be reopened before it is started again | `Status`, `Todo::try_become` |
-| Record update syntax in specs | Changing a todo's status leaves its priority alone, and the other way round; renaming it leaves both alone | `Todo::try_become`, `Todo::set_priority`, `Todo::rename` |
+| Record update syntax in specs | Changing a todo's status leaves its priority alone, and the other way round; renaming it leaves both alone; a copy of it has its priority and is open | `Todo::try_become`, `Todo::set_priority`, `Todo::rename`, `Todo::open_copy` |
 | Enums with refined variants, enum invariants | A parsed command fits the list it was parsed against, so running it needs no checks | `Command`, `parse` |
 | Refined arrays, const generics, refined function pointers | One counting loop serves any number of slots, and every todo lands in a slot that exists; a share is never more than the whole its type names | `TodoList::tally`, `Share` |
 | Refined closure signatures | The loop that hands indexes to a closure only hands out valid ones | `TodoList::each_index` |
@@ -64,7 +65,7 @@ a runtime panic or a silently wrong file.
 | Include patterns | The refined vector's file is the trusted base, named once | `Cargo.toml` (`include_trusted`) |
 | A refined vector (`RVec`) | Reading a todo at a proved index cannot panic | `src/rvec.rs` |
 | Detached specs, `trusted_derive` | Specs stated beside the code and not on it: for a derived `==` (trait impl), a function, an enum, a struct and its impl, a trait | `Status`, `indexes_of`, `Numbers`, `StatusSet`, `Choice` |
-| Opaque structs, trusted functions | A title is never blank | `Title`, `RVec` |
+| Opaque structs, trusted functions | A title is never blank, so its text makes a title again and a copy cannot fail | `Title`, `Title::copy`, `RVec` |
 | Type holes (`_`) in signatures, fields, variants and aliases | A spec names only the part it is about | `split_priority`, `parse`, `Picks`, `Command`, `Removed` |
 | Refined `impl Trait` | Every priority an iterator yields is a priority | `priorities` |
 | Refined `dyn Trait` | `next` and `now` choose a todo through a trait object, and the index that comes back is proved to be in the list | `Choice` |
