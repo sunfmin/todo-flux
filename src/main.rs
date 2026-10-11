@@ -38,6 +38,7 @@ usage: todo [list]             show all todos
        todo pri <n> <1-3>      set the priority of todo n (1 is highest)
        todo mv <n> <m>         move todo n to position m
        todo top <n>            move todo n to the front
+       todo bottom <n>         move todo n to the end
        todo swap <n> <m>       exchange todos n and m
        todo dup <n>            add a copy of todo n right after it
        todo rm <n|n-m>..       delete the todos numbered; 2-4 means 2, 3 and 4
@@ -220,6 +221,12 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
         )),
         ("mv", [n, m]) => Ok(Command::Move(index_of(list, n)?, index_of(list, m)?)),
         ("top", [n]) => Ok(Command::Move(index_of(list, n)?, 0)),
+        ("bottom", [n]) => {
+            // A list with a todo to move has a last index: the index proved
+            // to be in it is what lets Flux allow the subtraction.
+            let index = index_of(list, n)?;
+            Ok(Command::Move(index, list.len() - 1))
+        }
         ("swap", [n, m]) => Ok(Command::Swap(index_of(list, n)?, index_of(list, m)?)),
         ("dup", [n]) => Ok(Command::Duplicate(index_of(list, n)?)),
         ("rm", numbers) if !numbers.is_empty() => {
