@@ -257,6 +257,27 @@ fn mv_reorders_without_losing_todos() {
 }
 
 #[test]
+fn top_moves_a_todo_to_the_front_and_keeps_the_rest_in_order() {
+    let cli = Cli::new("top");
+    for title in ["a", "b", "c", "d"] {
+        cli.ok(&["add", title]);
+    }
+    cli.ok(&["top", "3"]);
+    assert_eq!(cli.stored(), "[ ] !2 c\n[ ] !2 a\n[ ] !2 b\n[ ] !2 d\n");
+    cli.ok(&["top", "1"]);
+    assert_eq!(cli.stored(), "[ ] !2 c\n[ ] !2 a\n[ ] !2 b\n[ ] !2 d\n");
+    cli.ok(&["top", "4"]);
+    assert_eq!(cli.stored(), "[ ] !2 d\n[ ] !2 c\n[ ] !2 a\n[ ] !2 b\n");
+
+    for args in [["top", "0"], ["top", "5"], ["top", "x"]] {
+        assert!(!cli.run(&args).status.success(), "{args:?}");
+    }
+    assert!(!cli.run(&["top"]).status.success());
+    assert!(!cli.run(&["top", "1", "2"]).status.success());
+    assert_eq!(cli.stored(), "[ ] !2 d\n[ ] !2 c\n[ ] !2 a\n[ ] !2 b\n");
+}
+
+#[test]
 fn swap_exchanges_two_todos_and_leaves_the_rest() {
     let cli = Cli::new("swap");
     for title in ["a", "b", "c", "d"] {
