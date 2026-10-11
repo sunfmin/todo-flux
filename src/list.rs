@@ -881,6 +881,21 @@ impl TodoList {
         self.items.insert(to, todo);
     }
 
+    /// Exchanges two todos. Every other todo stays where it is, and the list
+    /// keeps its length: both todos are taken out and each is put back where
+    /// the other was.
+    #[spec(fn(self: &mut TodoList[@n], a: usize{a < n}, b: usize{b < n}) ensures self: TodoList[n])]
+    pub fn swap(&mut self, a: usize, b: usize) {
+        let (low, high) = if a < b { (a, b) } else { (b, a) };
+        if low == high {
+            return;
+        }
+        let upper = self.items.remove(high);
+        let lower = self.items.remove(low);
+        self.items.insert(low, upper);
+        self.items.insert(high, lower);
+    }
+
     /// How much of the list is done.
     #[spec(fn(&TodoList[@n]) -> Progress{p: p.total == n})]
     pub fn progress(&self) -> Progress {

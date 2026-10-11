@@ -225,6 +225,33 @@ fn mv_reorders_without_losing_todos() {
 }
 
 #[test]
+fn swap_exchanges_two_todos_and_leaves_the_rest() {
+    let cli = Cli::new("swap");
+    for title in ["a", "b", "c", "d"] {
+        cli.ok(&["add", title]);
+    }
+    cli.ok(&["swap", "1", "3"]);
+    assert_eq!(cli.stored(), "[ ] !2 c\n[ ] !2 b\n[ ] !2 a\n[ ] !2 d\n");
+    cli.ok(&["swap", "4", "2"]);
+    assert_eq!(cli.stored(), "[ ] !2 c\n[ ] !2 d\n[ ] !2 a\n[ ] !2 b\n");
+    cli.ok(&["swap", "3", "4"]);
+    assert_eq!(cli.stored(), "[ ] !2 c\n[ ] !2 d\n[ ] !2 b\n[ ] !2 a\n");
+    cli.ok(&["swap", "2", "2"]);
+    assert_eq!(cli.stored(), "[ ] !2 c\n[ ] !2 d\n[ ] !2 b\n[ ] !2 a\n");
+
+    for args in [
+        ["swap", "0", "1"],
+        ["swap", "1", "5"],
+        ["swap", "5", "1"],
+        ["swap", "x", "1"],
+    ] {
+        assert!(!cli.run(&args).status.success(), "{args:?}");
+    }
+    assert!(!cli.run(&["swap", "1"]).status.success());
+    assert_eq!(cli.stored(), "[ ] !2 c\n[ ] !2 d\n[ ] !2 b\n[ ] !2 a\n");
+}
+
+#[test]
 fn rm_takes_several_numbers_but_none_twice() {
     let cli = Cli::new("rm-several");
     for title in ["a", "b", "c", "d"] {
