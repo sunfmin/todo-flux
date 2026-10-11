@@ -37,6 +37,7 @@ usage: todo [list]             show all todos
        todo undo <n>           mark todo n as open again
        todo pri <n> <1-3>      set the priority of todo n (1 is highest)
        todo mv <n> <m>         move todo n to position m
+       todo swap <n> <m>       exchange todos n and m
        todo rm <n|n-m>..       delete the todos numbered; 2-4 means 2, 3 and 4
        todo clear              delete every done todo
        todo count              show how many todos are open, doing and done
@@ -97,6 +98,8 @@ enum Command {
     Rename(usize, Title),
     #[variant((usize[@from], usize[@to]) -> Command[need_with(from + 1, to)])]
     Move(usize, usize),
+    #[variant((usize[@a], usize[@b]) -> Command[need_with(a + 1, b)])]
+    Swap(usize, usize),
     #[variant((Picks[@picks]) -> Command[picks.need])]
     Remove(Picks),
     #[variant(Command[0])]
@@ -164,6 +167,7 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
         Command::SetPriority(index, priority) => list.set_priority(index, priority),
         Command::Rename(index, title) => list.rename(index, title),
         Command::Move(from, to) => list.move_to(from, to),
+        Command::Swap(a, b) => list.swap(a, b),
         Command::Remove(picks) => written(print_removed(out, list.remove_all(&picks)))?,
         Command::Clear => {
             let done = StatusSet::none().with(Status::Done);
@@ -210,6 +214,7 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
             priority_of(level)?,
         )),
         ("mv", [n, m]) => Ok(Command::Move(index_of(list, n)?, index_of(list, m)?)),
+        ("swap", [n, m]) => Ok(Command::Swap(index_of(list, n)?, index_of(list, m)?)),
         ("rm", numbers) if !numbers.is_empty() => {
             let mut picks = Picks::none();
             for numbers in numbers {

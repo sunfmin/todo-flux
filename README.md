@@ -16,6 +16,7 @@ todo done <n>           mark todo n as done
 todo undo <n>           mark todo n as open again
 todo pri <n> <1-3>      set the priority of todo n (1 is highest)
 todo mv <n> <m>         move todo n to position m
+todo swap <n> <m>       exchange todos n and m
 todo rm <n|n-m>..       delete the todos numbered; 2-4 means 2, 3 and 4
 todo clear              delete every done todo
 todo count              show how many todos are open, doing and done
@@ -32,7 +33,7 @@ a runtime panic or a silently wrong file.
 
 | Flux capability | Rule it proves here | Where |
 |---|---|---|
-| Indexed types, strong references (`ensures`) | An index is below the list's length; `add` and `mv` change the length by exactly +1 and 0 | `TodoList` |
+| Indexed types, strong references (`ensures`) | An index is below the list's length; `add` changes the length by exactly +1, `mv` and `swap` by 0 | `TodoList` |
 | Existential types, type aliases, constants | A priority is always 1 to 3 | `Priority`, `priority` |
 | Spec functions (`defs!`), `let` binders | `locate` and `priority` return `Some` exactly when the input is valid, and exactly the right value | `is_position`, `is_priority`, `need_with` |
 | Struct invariants | There are never more done todos than todos, so "left" and "percent" are safe arithmetic | `Progress` |
