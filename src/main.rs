@@ -37,6 +37,7 @@ usage: todo [list]             show all todos
        todo undo <n>           mark todo n as open again
        todo pri <n> <1-3>      set the priority of todo n (1 is highest)
        todo mv <n> <m>         move todo n to position m
+       todo top <n>            move todo n to the front
        todo swap <n> <m>       exchange todos n and m
        todo rm <n|n-m>..       delete the todos numbered; 2-4 means 2, 3 and 4
        todo clear              delete every done todo
@@ -214,6 +215,7 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
             priority_of(level)?,
         )),
         ("mv", [n, m]) => Ok(Command::Move(index_of(list, n)?, index_of(list, m)?)),
+        ("top", [n]) => Ok(Command::Move(index_of(list, n)?, 0)),
         ("swap", [n, m]) => Ok(Command::Swap(index_of(list, n)?, index_of(list, m)?)),
         ("rm", numbers) if !numbers.is_empty() => {
             let mut picks = Picks::none();
