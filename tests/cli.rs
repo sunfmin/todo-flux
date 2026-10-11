@@ -206,6 +206,38 @@ fn priority_is_set_and_kept_in_range() {
 }
 
 #[test]
+fn rename_changes_only_the_title() {
+    let cli = Cli::new("rename");
+    for title in ["a", "b", "c"] {
+        cli.ok(&["add", title]);
+    }
+    cli.ok(&["start", "2"]);
+    cli.ok(&["pri", "2", "1"]);
+
+    assert!(
+        cli.ok(&["rename", "2", "call", "the bank"])
+            .starts_with(" 1. [ ] !2 a\n 2. [~] !1 call the bank\n 3. [ ] !2 c\n")
+    );
+    assert_eq!(cli.stored(), "[ ] !2 a\n[~] !1 call the bank\n[ ] !2 c\n");
+
+    let blank = |args: &[&str]| String::from_utf8(cli.run(args).stderr).unwrap();
+    let no_title = blank(&["add", "  "]);
+    assert_eq!(no_title, "todo: a todo needs a title\n");
+    assert_eq!(blank(&["rename", "2"]), no_title);
+    assert_eq!(blank(&["rename", "2", " ", "\n"]), no_title);
+
+    for n in ["0", "4", "x"] {
+        let renamed = cli.run(&["rename", n, "d"]);
+        let done = cli.run(&["done", n]);
+        assert!(!renamed.status.success(), "{n}");
+        assert!(renamed.stdout.is_empty());
+        assert_eq!(renamed.stderr, done.stderr, "{n}");
+    }
+    assert!(!cli.run(&["rename"]).status.success());
+    assert_eq!(cli.stored(), "[ ] !2 a\n[~] !1 call the bank\n[ ] !2 c\n");
+}
+
+#[test]
 fn mv_reorders_without_losing_todos() {
     let cli = Cli::new("mv");
     for title in ["a", "b", "c"] {
