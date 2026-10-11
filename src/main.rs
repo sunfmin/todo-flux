@@ -40,6 +40,7 @@ usage: todo [list]             show all todos
        todo mv <n> <m>         move todo n to position m
        todo top <n>            move todo n to the front
        todo swap <n> <m>       exchange todos n and m
+       todo dup <n>            add a copy of todo n right after it
        todo rm <n|n-m>..       delete the todos numbered; 2-4 means 2, 3 and 4
        todo clear              delete every done todo
        todo count              show how many todos are open, doing and done
@@ -102,6 +103,8 @@ enum Command {
     Move(usize, usize),
     #[variant((usize[@a], usize[@b]) -> Command[need_with(a + 1, b)])]
     Swap(usize, usize),
+    #[variant((usize[@index]) -> Command[index + 1])]
+    Duplicate(usize),
     #[variant((Picks[@picks]) -> Command[picks.need])]
     Remove(Picks),
     #[variant(Command[0])]
@@ -173,6 +176,7 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
         Command::Move(from, to) => list.move_to(from, to),
         Command::Swap(a, b) => list.swap(a, b),
         Command::Reopen => list.reopen(),
+        Command::Duplicate(index) => list.duplicate(index),
         Command::Remove(picks) => written(print_removed(out, list.remove_all(&picks)))?,
         Command::Clear => {
             let done = StatusSet::none().with(Status::Done);
@@ -222,6 +226,7 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
         ("mv", [n, m]) => Ok(Command::Move(index_of(list, n)?, index_of(list, m)?)),
         ("top", [n]) => Ok(Command::Move(index_of(list, n)?, 0)),
         ("swap", [n, m]) => Ok(Command::Swap(index_of(list, n)?, index_of(list, m)?)),
+        ("dup", [n]) => Ok(Command::Duplicate(index_of(list, n)?)),
         ("rm", numbers) if !numbers.is_empty() => {
             let mut picks = Picks::none();
             for numbers in numbers {
