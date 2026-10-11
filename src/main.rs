@@ -39,6 +39,7 @@ usage: todo [list]             show all todos
        todo mv <n> <m>         move todo n to position m
        todo rm <n|n-m>..       delete the todos numbered; 2-4 means 2, 3 and 4
        todo clear              delete every done todo
+       todo count              show how many todos are open, doing and done
 
 Todos are stored in $TODO_FILE (default: ~/.todo.txt).";
 
@@ -100,6 +101,8 @@ enum Command {
     Remove(Picks),
     #[variant(Command[0])]
     Clear,
+    #[variant(Command[0])]
+    Count,
 }
 
 /// Proved from the invariant alone, for a command built any way at all.
@@ -123,6 +126,16 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
         }
         Command::Help => {
             return written(writeln!(out, "{USAGE}"));
+        }
+        Command::Count => {
+            let counts = list.by_status();
+            return written(writeln!(
+                out,
+                "{} open, {} doing, {} done",
+                counts[Status::Open.slot()],
+                counts[Status::Doing.slot()],
+                counts[Status::Done.slot()]
+            ));
         }
         Command::Show(choice) => {
             return written(match choice.of(&list) {
@@ -183,6 +196,7 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
             Ok(Command::List(only))
         }
         ("clear", []) => Ok(Command::Clear),
+        ("count", []) => Ok(Command::Count),
         ("help" | "-h" | "--help", _) => Ok(Command::Help),
         ("next", []) => Ok(Command::Show(&MostUrgent)),
         ("now", []) => Ok(Command::Show(&InProgress)),
