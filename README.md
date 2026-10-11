@@ -17,6 +17,7 @@ todo pri <n> <1-3>   set the priority of todo n (1 is highest)
 todo mv <n> <m>      move todo n to position m
 todo rm <n|n-m>..    delete the todos numbered; 2-4 means 2, 3 and 4
 todo clear           delete every done todo
+todo count           show how many todos are open, doing and done
 ```
 
 Todos live in `$TODO_FILE` (default `~/.todo.txt`), one per line as

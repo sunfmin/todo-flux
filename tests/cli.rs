@@ -268,6 +268,26 @@ fn clear_removes_every_done_todo() {
 }
 
 #[test]
+fn count_prints_how_many_todos_are_in_each_status() {
+    let cli = Cli::new("count");
+    assert_eq!(cli.ok(&["count"]), "0 open, 0 doing, 0 done\n");
+
+    fs::write(
+        &cli.file,
+        "[ ] !2 a\n[x] !2 b\n[~] !1 c\n[x] !3 d\n[ ] !2 e\n[x] !2 f\n[x] !2 g\n",
+    )
+    .unwrap();
+    let stored = cli.stored();
+    assert_eq!(cli.ok(&["count"]), "2 open, 1 doing, 4 done\n");
+    assert_eq!(cli.stored(), stored);
+
+    let out = cli.run(&["count", "open"]);
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&out.stderr).starts_with("todo: cannot run 'count open'\n"));
+}
+
+#[test]
 fn numbers_line_up_in_a_long_list() {
     let cli = Cli::new("long");
     fs::write(&cli.file, "[ ] !2 t\n".repeat(100)).unwrap();
