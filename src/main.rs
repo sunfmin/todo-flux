@@ -35,6 +35,7 @@ usage: todo [list]             show all todos
        todo start <n>          mark todo n as being worked on
        todo done <n>           mark todo n as done
        todo undo <n>           mark todo n as open again
+       todo reopen             mark every done todo as open again
        todo pri <n> <1-3>      set the priority of todo n (1 is highest)
        todo mv <n> <m>         move todo n to position m
        todo top <n>            move todo n to the front
@@ -108,6 +109,8 @@ enum Command {
     #[variant((Picks[@picks]) -> Command[picks.need])]
     Remove(Picks),
     #[variant(Command[0])]
+    Reopen,
+    #[variant(Command[0])]
     Clear,
     #[variant(Command[0])]
     Count,
@@ -173,6 +176,7 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
         Command::Rename(index, title) => list.rename(index, title),
         Command::Move(from, to) => list.move_to(from, to),
         Command::Swap(a, b) => list.swap(a, b),
+        Command::Reopen => list.reopen(),
         Command::Duplicate(index) => list.duplicate(index),
         Command::Remove(picks) => written(print_removed(out, list.remove_all(&picks)))?,
         Command::Clear => {
@@ -205,6 +209,7 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
             }
             Ok(Command::List(only))
         }
+        ("reopen", []) => Ok(Command::Reopen),
         ("clear", []) => Ok(Command::Clear),
         ("count", []) => Ok(Command::Count),
         ("help" | "-h" | "--help", _) => Ok(Command::Help),

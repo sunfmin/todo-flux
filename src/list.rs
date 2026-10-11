@@ -930,6 +930,18 @@ impl TodoList {
         self.items.insert(high, lower);
     }
 
+    /// Marks every done todo as open. Todos that are open or being worked
+    /// on are left alone, and the list keeps its length: nothing is added
+    /// or removed.
+    #[spec(fn(self: &mut TodoList[@n]) ensures self: TodoList[n])]
+    pub fn reopen(&mut self) {
+        for i in 0..self.len() {
+            if self[i].status.is_done() {
+                self.set_status(i, Status::Open);
+            }
+        }
+    }
+
     /// Adds an open copy of a todo right after it. The list is exactly one
     /// longer: every todo after the copy moves down one and none is lost.
     #[spec(fn(self: &mut TodoList[@n], index: usize{index < n}) ensures self: TodoList[n + 1])]
