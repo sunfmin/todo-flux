@@ -566,6 +566,14 @@ impl Todo {
     pub fn set_priority(&mut self, priority: Priority) {
         self.priority = priority;
     }
+
+    /// Changes the title and nothing else: the status and the priority are
+    /// what they were.
+    #[spec(fn(self: &mut Todo[@t], Title) ensures self: Todo[t])]
+    #[no_panic]
+    pub fn rename(&mut self, title: Title) {
+        self.title = title;
+    }
 }
 
 /// Splits `!2 title` into its priority and title. Text without a valid
@@ -871,6 +879,12 @@ impl TodoList {
     #[no_panic]
     pub fn set_priority(&mut self, index: usize, priority: Priority) {
         self.items.get_mut(index).set_priority(priority);
+    }
+
+    #[spec(fn(&mut TodoList[@n], usize{i: i < n}, Title))]
+    #[no_panic]
+    pub fn rename(&mut self, index: usize, title: Title) {
+        self.items.get_mut(index).rename(title);
     }
 
     /// Moves a todo to another position. The list keeps its length: nothing

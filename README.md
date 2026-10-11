@@ -5,19 +5,20 @@ A command-line todo list in Rust whose rules are proved at compile time by
 program on purpose: each part of it shows one thing Flux can do.
 
 ```
-todo [list]          show all todos
-todo list <status>.. show only open, doing or done todos
-todo next            show the most urgent todo that is not done
-todo now             show the todo being worked on
-todo add <title>     add a todo
-todo start <n>       mark todo n as being worked on
-todo done <n>        mark todo n as done
-todo undo <n>        mark todo n as open again
-todo pri <n> <1-3>   set the priority of todo n (1 is highest)
-todo mv <n> <m>      move todo n to position m
-todo rm <n|n-m>..    delete the todos numbered; 2-4 means 2, 3 and 4
-todo clear           delete every done todo
-todo count           show how many todos are open, doing and done
+todo [list]             show all todos
+todo list <status>..    show only open, doing or done todos
+todo next               show the most urgent todo that is not done
+todo now                show the todo being worked on
+todo add <title>        add a todo
+todo rename <n> <title> change the title of todo n
+todo start <n>          mark todo n as being worked on
+todo done <n>           mark todo n as done
+todo undo <n>           mark todo n as open again
+todo pri <n> <1-3>      set the priority of todo n (1 is highest)
+todo mv <n> <m>         move todo n to position m
+todo rm <n|n-m>..       delete the todos numbered; 2-4 means 2, 3 and 4
+todo clear              delete every done todo
+todo count              show how many todos are open, doing and done
 ```
 
 Todos live in `$TODO_FILE` (default `~/.todo.txt`), one per line as
@@ -36,7 +37,7 @@ a runtime panic or a silently wrong file.
 | Spec functions (`defs!`), `let` binders | `locate` and `priority` return `Some` exactly when the input is valid, and exactly the right value | `is_position`, `is_priority`, `need_with` |
 | Struct invariants | There are never more done todos than todos, so "left" and "percent" are safe arithmetic | `Progress` |
 | Reflected enums, structs indexed by them | A status changes only as the rules allow: a done todo must be reopened before it is started again | `Status`, `Todo::try_become` |
-| Record update syntax in specs | Changing a todo's status leaves its priority alone, and the other way round | `Todo::try_become`, `Todo::set_priority` |
+| Record update syntax in specs | Changing a todo's status leaves its priority alone, and the other way round; renaming it leaves both alone | `Todo::try_become`, `Todo::set_priority`, `Todo::rename` |
 | Enums with refined variants, enum invariants | A parsed command fits the list it was parsed against, so running it needs no checks | `Command`, `parse` |
 | Refined arrays, const generics, refined function pointers | One counting loop serves any number of slots, and every todo lands in a slot that exists; a share is never more than the whole its type names | `TodoList::tally`, `Share` |
 | Refined closure signatures | The loop that hands indexes to a closure only hands out valid ones | `TodoList::each_index` |

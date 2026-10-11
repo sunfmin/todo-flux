@@ -26,19 +26,20 @@ use list::{
 };
 
 const USAGE: &str = "\
-usage: todo [list]          show all todos
-       todo list <status>.. show only open, doing or done todos
-       todo next            show the most urgent todo that is not done
-       todo now             show the todo being worked on
-       todo add <title>     add a todo
-       todo start <n>       mark todo n as being worked on
-       todo done <n>        mark todo n as done
-       todo undo <n>        mark todo n as open again
-       todo pri <n> <1-3>   set the priority of todo n (1 is highest)
-       todo mv <n> <m>      move todo n to position m
-       todo rm <n|n-m>..    delete the todos numbered; 2-4 means 2, 3 and 4
-       todo clear           delete every done todo
-       todo count           show how many todos are open, doing and done
+usage: todo [list]             show all todos
+       todo list <status>..    show only open, doing or done todos
+       todo next               show the most urgent todo that is not done
+       todo now                show the todo being worked on
+       todo add <title>        add a todo
+       todo rename <n> <title> change the title of todo n
+       todo start <n>          mark todo n as being worked on
+       todo done <n>           mark todo n as done
+       todo undo <n>           mark todo n as open again
+       todo pri <n> <1-3>      set the priority of todo n (1 is highest)
+       todo mv <n> <m>         move todo n to position m
+       todo rm <n|n-m>..       delete the todos numbered; 2-4 means 2, 3 and 4
+       todo clear              delete every done todo
+       todo count              show how many todos are open, doing and done
 
 Todos are stored in $TODO_FILE (default: ~/.todo.txt).";
 
@@ -92,6 +93,8 @@ enum Command {
     SetStatus(usize, Status),
     #[variant((usize[@index], Priority) -> Command[index + 1])]
     SetPriority(usize, Priority),
+    #[variant((usize[@index], _) -> Command[index + 1])]
+    Rename(usize, Title),
     #[variant((usize[@from], usize[@to]) -> Command[need_with(from + 1, to)])]
     Move(usize, usize),
     #[variant((Picks[@picks]) -> Command[picks.need])]
@@ -159,6 +162,7 @@ fn run(args: &[String], out: &mut dyn Write) -> Result<(), String> {
             }
         }
         Command::SetPriority(index, priority) => list.set_priority(index, priority),
+        Command::Rename(index, title) => list.rename(index, title),
         Command::Move(from, to) => list.move_to(from, to),
         Command::Remove(picks) => written(print_removed(out, list.remove_all(&picks)))?,
         Command::Clear => {
@@ -196,10 +200,8 @@ fn parse(list: &TodoList, args: &[String]) -> Result<Command, String> {
         ("help" | "-h" | "--help", _) => Ok(Command::Help),
         ("next", []) => Ok(Command::Show(&MostUrgent)),
         ("now", []) => Ok(Command::Show(&InProgress)),
-        ("add", words) => match Title::new(&words.join(" ")) {
-            Some(title) => Ok(Command::Add(title)),
-            None => Err("add needs a title".to_string()),
-        },
+        ("add", words) => Ok(Command::Add(title_of(words)?)),
+        ("rename", [n, ..]) => Ok(Command::Rename(index_of(list, n)?, title_of(&rest[1..])?)),
         ("start", [n]) => Ok(Command::SetStatus(index_of(list, n)?, Status::Doing)),
         ("done", [n]) => Ok(Command::SetStatus(index_of(list, n)?, Status::Done)),
         ("undo", [n]) => Ok(Command::SetStatus(index_of(list, n)?, Status::Open)),
@@ -251,6 +253,15 @@ fn index_of(list: &TodoList, arg: &str) -> Result<usize, String> {
     match list.locate(pos) {
         Some(index) => Ok(index),
         None => Err(format!("no todo {pos} (the list has {})", list.len())),
+    }
+}
+
+/// The title the words of a command make, joined with spaces. A todo without
+/// one is refused in the same words whichever command asked for it.
+fn title_of(words: &[String]) -> Result<Title, String> {
+    match Title::new(&words.join(" ")) {
+        Some(title) => Ok(title),
+        None => Err("a todo needs a title".to_string()),
     }
 }
 
