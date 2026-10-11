@@ -18,6 +18,7 @@ todo reopen             mark every done todo as open again
 todo pri <n> <1-3>      set the priority of todo n (1 is highest)
 todo mv <n> <m>         move todo n to position m
 todo top <n>            move todo n to the front
+todo bottom <n>         move todo n to the end
 todo swap <n> <m>       exchange todos n and m
 todo dup <n>            add a copy of todo n right after it
 todo rm <n|n-m>..       delete the todos numbered; 2-4 means 2, 3 and 4

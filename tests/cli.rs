@@ -278,6 +278,27 @@ fn top_moves_a_todo_to_the_front_and_keeps_the_rest_in_order() {
 }
 
 #[test]
+fn bottom_moves_a_todo_to_the_end_and_keeps_the_rest_in_order() {
+    let cli = Cli::new("bottom");
+    for title in ["a", "b", "c", "d"] {
+        cli.ok(&["add", title]);
+    }
+    cli.ok(&["bottom", "2"]);
+    assert_eq!(cli.stored(), "[ ] !2 a\n[ ] !2 c\n[ ] !2 d\n[ ] !2 b\n");
+    cli.ok(&["bottom", "4"]);
+    assert_eq!(cli.stored(), "[ ] !2 a\n[ ] !2 c\n[ ] !2 d\n[ ] !2 b\n");
+    cli.ok(&["bottom", "1"]);
+    assert_eq!(cli.stored(), "[ ] !2 c\n[ ] !2 d\n[ ] !2 b\n[ ] !2 a\n");
+
+    for args in [["bottom", "0"], ["bottom", "5"], ["bottom", "x"]] {
+        assert!(!cli.run(&args).status.success(), "{args:?}");
+    }
+    assert!(!cli.run(&["bottom"]).status.success());
+    assert!(!cli.run(&["bottom", "1", "2"]).status.success());
+    assert_eq!(cli.stored(), "[ ] !2 c\n[ ] !2 d\n[ ] !2 b\n[ ] !2 a\n");
+}
+
+#[test]
 fn swap_exchanges_two_todos_and_leaves_the_rest() {
     let cli = Cli::new("swap");
     for title in ["a", "b", "c", "d"] {
