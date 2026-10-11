@@ -282,9 +282,18 @@ impl Title {
         self.0.chars().count()
     }
 
+    /// The text of the title, which is not blank: it made this title once,
+    /// so it makes one again.
     #[trusted]
+    #[spec(fn(&Title) -> &str{text: !blank(text)})]
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// Another title with the same text. Not trusted: Flux proves from the
+    /// two specs above that the text of a title always makes a title.
+    pub fn copy(&self) -> Title {
+        Title::new(self.as_str()).unwrap()
     }
 }
 
@@ -526,6 +535,17 @@ impl Todo {
             status: or_default(marked),
             priority,
         })
+    }
+
+    /// A copy of the todo to do again: the same title and priority, and
+    /// open whatever the status of this one.
+    #[spec(fn(&Todo[@t]) -> Todo[Todo { status: Status::Open, ..t }])]
+    pub fn open_copy(&self) -> Todo {
+        Todo {
+            title: self.title.copy(),
+            status: Status::default(),
+            priority: self.priority,
+        }
     }
 
     /// The slot of this todo in `TodoList::open_by_priority`: its priority's,
@@ -908,6 +928,15 @@ impl TodoList {
         let lower = self.items.remove(low);
         self.items.insert(low, upper);
         self.items.insert(high, lower);
+    }
+
+    /// Adds an open copy of a todo right after it. The list is exactly one
+    /// longer: every todo after the copy moves down one and none is lost.
+    #[spec(fn(self: &mut TodoList[@n], index: usize{index < n}) ensures self: TodoList[n + 1])]
+    pub fn duplicate(&mut self, index: usize) {
+        let copy = self.items.get(index).open_copy();
+        let after = self.position(index);
+        self.items.insert(after, copy);
     }
 
     /// How much of the list is done.
