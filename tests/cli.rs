@@ -384,6 +384,36 @@ fn clear_removes_every_done_todo() {
 }
 
 #[test]
+fn reopen_marks_every_done_todo_open_and_leaves_the_rest() {
+    let cli = Cli::new("reopen");
+    fs::write(&cli.file, "[x] !1 a\n[~] !2 b\n[ ] !3 c\n[x] !2 d\n").unwrap();
+    assert_eq!(cli.ok(&["count"]), "1 open, 1 doing, 2 done\n");
+
+    assert!(
+        cli.ok(&["reopen"])
+            .starts_with(" 1. [ ] !1 a\n 2. [~] !2 b\n 3. [ ] !3 c\n 4. [ ] !2 d\n0/4 done")
+    );
+    assert_eq!(cli.stored(), "[ ] !1 a\n[~] !2 b\n[ ] !3 c\n[ ] !2 d\n");
+    assert_eq!(cli.ok(&["count"]), "3 open, 1 doing, 0 done\n");
+    assert!(cli.ok(&["list", "done"]).starts_with("0/4 done"));
+    assert!(cli.ok(&["now"]).starts_with(" 2. [~] !2 b\n"));
+
+    // With no done todo it changes nothing and succeeds.
+    let stored = cli.stored();
+    cli.ok(&["reopen"]);
+    assert_eq!(cli.stored(), stored);
+
+    assert!(!cli.run(&["reopen", "1"]).status.success());
+    assert_eq!(cli.stored(), stored);
+}
+
+#[test]
+fn reopen_succeeds_on_an_empty_list() {
+    let cli = Cli::new("reopen-empty");
+    assert_eq!(cli.ok(&["reopen"]), "nothing to do\n");
+}
+
+#[test]
 fn count_prints_how_many_todos_are_in_each_status() {
     let cli = Cli::new("count");
     assert_eq!(cli.ok(&["count"]), "0 open, 0 doing, 0 done\n");
